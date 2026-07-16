@@ -1,0 +1,7 @@
+name = "material-ai-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# 部署后运行以下命令设置 API Key：
+# wrangler secret put AI_API_KEY
+# 然后粘贴你的阿里云百练 API Key（sk-xxx 格式）

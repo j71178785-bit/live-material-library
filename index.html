@@ -197,6 +197,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
 .bg-scene{background:#f0fdf4}
 .bg-ref{background:#fff8f0}
 .bg-other{background:#f8f8f8}
+
+/* ===== AI SECTION ===== */
+.ai-section{border:1.5px solid #e8e0ff;border-radius:12px;padding:14px;margin-bottom:14px;background:#fafaff}
+.ai-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ai-icon{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#7c5cfc,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0}
+.ai-title{font-size:13px;font-weight:600;color:#534ab7}
+.ai-badge{font-size:10px;background:#f0ebff;color:#7c5cfc;padding:2px 7px;border-radius:8px;font-weight:500}
+.ai-transcript{width:100%;border:1px solid #e8e8e8;border-radius:8px;padding:8px 11px;font-size:12px;color:#333;outline:none;resize:vertical;min-height:56px;font-family:inherit;transition:border-color .15s}
+.ai-transcript:focus{border-color:#7c5cfc}
+.ai-transcript::placeholder{color:#ccc}
+.ai-btn{padding:7px 16px;border-radius:8px;background:linear-gradient(135deg,#7c5cfc,#a78bfa);color:#fff;border:none;font-size:12px;cursor:pointer;font-weight:500;transition:opacity .15s;white-space:nowrap}
+.ai-btn:hover{opacity:.9}
+.ai-btn:disabled{opacity:.5;cursor:not-allowed}
+.ai-result{margin-top:12px;display:none}
+.ai-result.show{display:block}
+.ai-result-summary{font-size:12px;color:#555;line-height:1.7;background:#f5f3ff;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.ai-result-section{margin-bottom:10px}
+.ai-result-label{font-size:11px;font-weight:600;color:#7c5cfc;margin-bottom:5px}
+.ai-phase{background:#f8f7ff;border:1px solid #e8e0ff;border-radius:8px;padding:8px 11px;margin-bottom:5px}
+.ai-phase-head{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.ai-phase-name{font-size:12px;font-weight:500;color:#534ab7}
+.ai-phase-detail{font-size:11px;color:#777;line-height:1.5}
+.ai-phase-technique{font-size:11px;color:#059669;margin-top:2px}
+.ai-suggested-tags{display:flex;gap:6px;flex-wrap:wrap}
+.ai-tag-chip{display:inline-flex;align-items:center;gap:3px;background:#f0ebff;color:#7c5cfc;border:1px solid #c4b5fd;border-radius:10px;padding:3px 9px;font-size:11px;cursor:pointer;transition:all .15s}
+.ai-tag-chip:hover{background:#7c5cfc;color:#fff}
+.ai-key-points{font-size:12px;color:#555;line-height:1.7}
+.ai-key-points li{margin-bottom:3px;margin-left:16px}
+.ai-suggestions{font-size:12px;color:#d97706;line-height:1.7}
+.ai-suggestions li{margin-bottom:3px;margin-left:16px}
+.ai-loading{display:flex;align-items:center;gap:8px;font-size:12px;color:#999;padding:8px 0}
+.ai-spinner{width:14px;height:14px;border:2px solid #e8e0ff;border-top-color:#7c5cfc;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-error{font-size:12px;color:#dc2626;background:#fef2f2;border-radius:8px;padding:8px 11px;margin-top:8px}
+.ai-actions{display:flex;gap:8px;margin-top:10px}
+.ai-adopt-btn{padding:5px 12px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;color:#059669;font-size:11px;cursor:pointer;transition:all .15s}
+.ai-adopt-btn:hover{background:#059669;color:#fff}
+
+/* ===== SETTINGS MODAL ===== */
+.settings-row{display:flex;gap:8px;align-items:center}
+.settings-row input{flex:1}
 </style>
 </head>
 <body>
@@ -218,6 +259,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
       <input type="text" id="searchInput" placeholder="搜索备注、标签、文件名…">
     </div>
     <div class="nav-btns">
+      <button class="btn-sm" id="btnAiSettings">AI 设置</button>
       <button class="btn-sm" id="btnBatchMode">批量管理</button>
       <button class="btn-sm" id="btnReport">📊 导出报告</button>
       <button class="btn-sm" id="btnExport">备份 JSON</button>
@@ -363,6 +405,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
         <label class="fl">备注</label>
         <textarea class="fta" id="detailNote" placeholder="添加备注…"></textarea>
       </div>
+
+      <!-- AI 分析区域 -->
+      <div class="ai-section">
+        <div class="ai-header">
+          <div class="ai-icon">AI</div>
+          <span class="ai-title">AI 内容分析</span>
+          <span class="ai-badge" id="aiStatusBadge">未连接</span>
+        </div>
+        <div class="fg">
+          <label class="fl">转写文本 / 内容描述（可选，用于视频框架拆解）</label>
+          <textarea class="ai-transcript" id="aiTranscript" placeholder="粘贴视频转写文本，或描述素材内容…"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="ai-btn" id="aiAnalyzeBtn">分析内容</button>
+          <button class="ai-btn" id="aiTagsBtn" style="background:#fff;color:#7c5cfc;border:1px solid #c4b5fd">推荐标签</button>
+        </div>
+        <div class="ai-result" id="aiResult">
+          <div class="ai-loading" id="aiLoading" style="display:none">
+            <div class="ai-spinner"></div>
+            <span>AI 分析中…</span>
+          </div>
+          <div id="aiResultContent"></div>
+        </div>
+      </div>
+
       <div class="mf">
         <button class="btn-del" id="detailDelete">删除素材</button>
         <button class="btn-cancel" id="detailCancel">取消</button>
@@ -409,6 +476,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
       <div class="mf" style="margin-top:16px">
         <button class="btn-cancel" id="reportCancel">关闭</button>
         <button class="btn-ok" id="reportDownload">下载 HTML 报告</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI 设置弹窗 -->
+<div class="overlay" id="aiSettingsModal" style="display:none">
+  <div class="modal modal-sm">
+    <div class="mh">
+      <div class="mt">AI 连接设置</div>
+      <button class="mc" id="aiSettingsClose">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <label class="fl">Worker URL（API 代理地址）</label>
+        <input class="finp" id="workerUrlInput" placeholder="https://material-ai-proxy.xxx.workers.dev">
+      </div>
+      <div style="font-size:11px;color:#999;line-height:1.6;margin-bottom:12px">
+        在 Cloudflare 部署 Worker 后会获得此地址。<br>
+        API Key 存在 Worker 环境变量里，不会出现在前端代码中。
+      </div>
+      <div class="mf">
+        <button class="btn-cancel" id="aiSettingsCancel">取消</button>
+        <button class="btn-ok" id="aiSettingsSave">保存设置</button>
       </div>
     </div>
   </div>
@@ -938,6 +1029,20 @@ function openDetailModal(id) {
     };
   });
 
+  // AI 区域：恢复已有结果或清空
+  updateAiStatus();
+  const aiResultEl = document.getElementById('aiResult');
+  const aiContentEl = document.getElementById('aiResultContent');
+  if (m.aiResult) {
+    aiResultEl.classList.add('show');
+    aiContentEl.innerHTML = '';
+    renderAiResult({ success: true, data: m.aiResult });
+  } else {
+    aiResultEl.classList.remove('show');
+    aiContentEl.innerHTML = '';
+  }
+  document.getElementById('aiTranscript').value = m.aiTranscript || '';
+
   document.getElementById('detailModal').style.display = 'flex';
 }
 
@@ -962,6 +1067,7 @@ document.getElementById('detailSave').onclick = () => {
   materials[idx].cat = document.getElementById('detailCat').value;
   materials[idx].note = document.getElementById('detailNote').value.trim();
   materials[idx].tags = detailTags.slice();
+  materials[idx].aiTranscript = document.getElementById('aiTranscript').value.trim();
   saveData(materials);
   closeDetailModal();
   render();
@@ -1074,20 +1180,224 @@ document.getElementById('btnExport').onclick = () => {
 // ===========================
 // MODAL CLOSE HELPERS
 // ===========================
-['uploadModal','detailModal','batchCatModal','reportModal'].forEach(id => {
+['uploadModal','detailModal','batchCatModal','reportModal','aiSettingsModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => {
     if (e.target === e.currentTarget) { e.currentTarget.style.display='none'; }
   });
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['uploadModal','detailModal','batchCatModal','reportModal'].forEach(id => { document.getElementById(id).style.display='none'; });
+    ['uploadModal','detailModal','batchCatModal','reportModal','aiSettingsModal'].forEach(id => { document.getElementById(id).style.display='none'; });
   }
 });
 
 // ===========================
+// AI 功能
+// ===========================
+const WORKER_URL_KEY = 'ai_worker_url';
+
+function getWorkerUrl() {
+  return localStorage.getItem(WORKER_URL_KEY) || '';
+}
+
+function updateAiStatus() {
+  const url = getWorkerUrl();
+  const badge = document.getElementById('aiStatusBadge');
+  if (badge) {
+    if (url) {
+      badge.textContent = '已连接';
+      badge.style.background = '#f0fdf4';
+      badge.style.color = '#059669';
+    } else {
+      badge.textContent = '未连接';
+      badge.style.background = '#fef2f2';
+      badge.style.color = '#dc2626';
+    }
+  }
+}
+
+// AI 设置弹窗
+document.getElementById('btnAiSettings').onclick = () => {
+  document.getElementById('workerUrlInput').value = getWorkerUrl();
+  document.getElementById('aiSettingsModal').style.display = 'flex';
+};
+document.getElementById('aiSettingsClose').onclick = () => document.getElementById('aiSettingsModal').style.display = 'none';
+document.getElementById('aiSettingsCancel').onclick = () => document.getElementById('aiSettingsModal').style.display = 'none';
+document.getElementById('aiSettingsSave').onclick = () => {
+  const url = document.getElementById('workerUrlInput').value.trim();
+  if (url && !url.startsWith('http')) {
+    showToast('URL 格式不正确，需以 https:// 开头');
+    return;
+  }
+  localStorage.setItem(WORKER_URL_KEY, url);
+  document.getElementById('aiSettingsModal').style.display = 'none';
+  updateAiStatus();
+  showToast(url ? '✓ AI 设置已保存' : '已清除 AI 设置');
+};
+
+// 调用 Worker API
+async function callAiApi(action, payload) {
+  const workerUrl = getWorkerUrl();
+  if (!workerUrl) {
+    throw new Error('请先在「AI 设置」中填写 Worker URL');
+  }
+  const resp = await fetch(workerUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// 渲染 AI 分析结果
+function renderAiResult(result) {
+  const el = document.getElementById('aiResultContent');
+  if (!result || !result.success) {
+    el.innerHTML = '<div class="ai-error">分析失败，请重试</div>';
+    return;
+  }
+  const d = result.data;
+  let html = '';
+
+  // 摘要
+  if (d.summary) {
+    html += `<div class="ai-result-summary">${escHtml(d.summary)}</div>`;
+  }
+
+  // 框架拆解
+  if (d.phases && d.phases.length) {
+    html += '<div class="ai-result-section"><div class="ai-result-label">框架节奏拆解</div>';
+    d.phases.forEach(p => {
+      html += `<div class="ai-phase">
+        <div class="ai-phase-head"><span class="ai-phase-name">${escHtml(p.phase)}</span></div>
+        <div class="ai-phase-detail">${escHtml(p.content || p.detail || '')}</div>
+        ${p.technique ? `<div class="ai-phase-technique">技巧：${escHtml(p.technique)}</div>` : ''}
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // 关键话术
+  if (d.keyPoints && d.keyPoints.length) {
+    html += '<div class="ai-result-section"><div class="ai-result-label">关键话术</div><ul class="ai-key-points">';
+    d.keyPoints.forEach(k => { html += `<li>${escHtml(k)}</li>`; });
+    html += '</ul></div>';
+  }
+
+  // 改进建议
+  if (d.suggestions && d.suggestions.length) {
+    html += '<div class="ai-result-section"><div class="ai-result-label">改进建议</div><ul class="ai-suggestions">';
+    d.suggestions.forEach(s => { html += `<li>${escHtml(s)}</li>`; });
+    html += '</ul></div>';
+  }
+
+  // 推荐标签
+  if (d.tags && d.tags.length) {
+    html += '<div class="ai-result-section"><div class="ai-result-label">推荐标签（点击采纳）</div><div class="ai-suggested-tags">';
+    d.tags.forEach(t => {
+      html += `<span class="ai-tag-chip" data-tag="${escAttr(t)}">+ ${escHtml(t)}</span>`;
+    });
+    html += '</div></div>';
+  }
+
+  // 原始返回（兜底）
+  if (!html && d.rawResponse) {
+    html = `<div class="ai-result-summary">${escHtml(d.rawResponse)}</div>`;
+  }
+
+  el.innerHTML = html;
+
+  // 绑定标签采纳点击
+  el.querySelectorAll('.ai-tag-chip').forEach(chip => {
+    chip.onclick = () => {
+      const tag = chip.dataset.tag;
+      const cur = detailTagCtrl.getTags();
+      if (!cur.includes(tag)) {
+        detailTagCtrl.setTags([...cur, tag]);
+        chip.style.opacity = '0.4';
+        chip.style.pointerEvents = 'none';
+        showToast('已添加标签：' + tag);
+      }
+    };
+  });
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escAttr(s) {
+  return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// AI 分析按钮
+document.getElementById('aiAnalyzeBtn').onclick = async () => {
+  if (!currentDetailId) return;
+  const m = materials.find(x => x.id === currentDetailId);
+  if (!m) return;
+  const transcript = document.getElementById('aiTranscript').value.trim();
+
+  const resultEl = document.getElementById('aiResult');
+  const loadingEl = document.getElementById('aiLoading');
+  const contentEl = document.getElementById('aiResultContent');
+
+  resultEl.classList.add('show');
+  loadingEl.style.display = 'flex';
+  contentEl.innerHTML = '';
+
+  try {
+    const result = await callAiApi('analyze', {
+      name: m.name,
+      cat: m.cat,
+      note: m.note || document.getElementById('detailNote').value.trim(),
+      transcript: transcript,
+    });
+    loadingEl.style.display = 'none';
+    renderAiResult(result);
+
+    // 保存到素材数据
+    m.aiResult = result.data;
+    saveData(materials);
+  } catch (err) {
+    loadingEl.style.display = 'none';
+    contentEl.innerHTML = `<div class="ai-error">${escHtml(err.message)}</div>`;
+  }
+};
+
+// AI 推荐标签按钮
+document.getElementById('aiTagsBtn').onclick = async () => {
+  if (!currentDetailId) return;
+  const m = materials.find(x => x.id === currentDetailId);
+  if (!m) return;
+
+  const resultEl = document.getElementById('aiResult');
+  const loadingEl = document.getElementById('aiLoading');
+  const contentEl = document.getElementById('aiResultContent');
+
+  resultEl.classList.add('show');
+  loadingEl.style.display = 'flex';
+  contentEl.innerHTML = '';
+
+  try {
+    const result = await callAiApi('suggest-tags', {
+      name: m.name,
+      cat: m.cat,
+      note: m.note || document.getElementById('detailNote').value.trim(),
+      transcript: document.getElementById('aiTranscript').value.trim(),
+    });
+    loadingEl.style.display = 'none';
+    renderAiResult(result);
+  } catch (err) {
+    loadingEl.style.display = 'none';
+    contentEl.innerHTML = `<div class="ai-error">${escHtml(err.message)}</div>`;
+  }
+};
+
+// ===========================
 // INIT
 // ===========================
+updateAiStatus();
 render();
 </script>
 </body>
