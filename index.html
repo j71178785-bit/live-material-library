@@ -491,7 +491,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
     <div class="mb">
       <div class="fg">
         <label class="fl">Worker URL（API 代理地址）</label>
-        <input class="finp" id="workerUrlInput" placeholder="https://material-ai-proxy.xxx.workers.dev">
+        <input class="finp" id="workerUrlInput" placeholder="https://materialai-proxy-xxx.cn-hangzhou.fcapp.run">
       </div>
       <div style="font-size:11px;color:#999;line-height:1.6;margin-bottom:12px">
         在 Cloudflare 部署 Worker 后会获得此地址。<br>
@@ -1197,7 +1197,7 @@ document.addEventListener('keydown', e => {
 const WORKER_URL_KEY = 'ai_worker_url';
 
 function getWorkerUrl() {
-  return localStorage.getItem(WORKER_URL_KEY) || 'https://material-ai-proxy.yingchao-huang.workers.dev';
+  return localStorage.getItem(WORKER_URL_KEY) || 'https://materialai-proxy-manfhdjiztf.cn-hangzhou.fcapp.run';
 }
 
 function updateAiStatus() {
