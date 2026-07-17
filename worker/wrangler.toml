@@ -1,6 +1,7 @@
 name = "material-ai-proxy"
 main = "worker.js"
 compatibility_date = "2024-01-01"
+account_id = "af758e9bf41e69084fb3a86629607937"
 
 # 部署后运行以下命令设置 API Key：
 # wrangler secret put AI_API_KEY

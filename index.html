@@ -1197,7 +1197,7 @@ document.addEventListener('keydown', e => {
 const WORKER_URL_KEY = 'ai_worker_url';
 
 function getWorkerUrl() {
-  return localStorage.getItem(WORKER_URL_KEY) || '';
+  return localStorage.getItem(WORKER_URL_KEY) || 'https://material-ai-proxy.yingchao-huang.workers.dev';
 }
 
 function updateAiStatus() {
