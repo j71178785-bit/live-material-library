@@ -1468,6 +1468,7 @@ function loadBgTasks() {
 function toggleBgPanel() {
   const panel = document.getElementById('bgTaskPanel');
   panel.classList.toggle('minimized');
+  renderBgTasks(); // 展开/折叠时重新渲染，确保内容同步
 }
 
 function showBgPanel() {
@@ -1541,7 +1542,12 @@ function dismissBgTask(id) {
 
 function renderBgTasks() {
   const list = document.getElementById('bgTaskList');
-  const empty = document.getElementById('bgTaskEmpty');
+  let empty = document.getElementById('bgTaskEmpty');
+  if (!empty) {
+    empty = document.createElement('div');
+    empty.className = 'bg-task-empty';
+    empty.textContent = '暂无正在处理的任务';
+  }
 
   if (!bgTasks.length) {
     list.innerHTML = '';
@@ -1551,10 +1557,11 @@ function renderBgTasks() {
   }
 
   list.innerHTML = bgTasks.map(t => {
+    if (!t) return '';
     const icon = t.status === 'done' ? '✓' : t.status === 'failed' ? '✕' : t.status === 'interrupted' ? '⚠' : '●';
     const cls = t.status === 'done' ? 'done' : t.status === 'failed' ? 'failed' : t.status === 'interrupted' ? 'interrupted' : 'running';
     const fillCls = (t.status === 'failed' || t.status === 'interrupted') ? 'error' : '';
-    const stepText = t.step || (t.status === 'done' ? '处理完成 ✓' : t.status === 'failed' ? t.error : t.status === 'interrupted' ? '⚠️ 处理被中断，请重新上传' : '排队中...');
+    const stepText = t.step || (t.status === 'done' ? '处理完成 ✓' : t.status === 'failed' ? (t.error || '处理失败') : t.status === 'interrupted' ? '⚠️ 处理被中断，请重新上传' : '排队中...');
     const actions = t.status === 'done'
       ? `<button class="bg-task-btn" onclick="viewBgTaskResult('${t.materialId}')">查看</button>`
       : (t.status === 'failed' || t.status === 'interrupted')
@@ -1567,10 +1574,10 @@ function renderBgTasks() {
     return `<div class="bg-task-item">
       <div class="bg-task-status ${cls}">${icon}</div>
       <div class="bg-task-info">
-        <div class="bg-task-name" title="${escAttr(t.name)}">${escHtml(t.name)}</div>
+        <div class="bg-task-name" title="${escAttr(t.name)}">${escHtml(t.name || '未命名任务')}</div>
         <div class="bg-task-step">${stepText}</div>
         <div class="bg-task-progress">
-          <div class="bg-task-progress-fill ${fillCls}" style="width:${t.progress}%"></div>
+          <div class="bg-task-progress-fill ${fillCls}" style="width:${t.progress || 0}%"></div>
         </div>
       </div>
       <div class="bg-task-actions">${actions}${dismissBtn}</div>

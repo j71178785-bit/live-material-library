@@ -337,7 +337,11 @@ async function sendPCM(pcmBuffer, ws, taskId) {
       return;
     }
     const end = Math.min(offset + CHUNK, pcmBuffer.length);
-    ws.send(pcmBuffer.slice(offset, end));
+    // 确保发送的是 Buffer 类型，避免 ws 库将 Uint8Array 误转为字符串
+    const chunk = Buffer.isBuffer(pcmBuffer)
+      ? pcmBuffer.slice(offset, end)
+      : Buffer.from(pcmBuffer.slice(offset, end));
+    ws.send(chunk);
     // 极小延迟让出事件循环，同时避免 TCP 发送缓冲区塞满
     await sleep(5);
   }
