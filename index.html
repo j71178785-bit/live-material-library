@@ -1033,14 +1033,32 @@ dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classL
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
 
+function isDouyinUrl(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return /(^|\.)douyin\.com$/.test(host) || host === 'v.douyin.com';
+  } catch(e) { return false; }
+}
+
 function handleLink(url) {
   url = url.trim();
   if (!url) { showToast('请输入链接'); return; }
   try { new URL(url); } catch(e) { showToast('链接格式不正确'); return; }
   if (materials.find(m => m.url === url)) { showToast('该链接已存在'); return; }
-  let name = '';
-  try { name = new URL(url).hostname.replace('www.',''); } catch(e) { name = url.slice(0,30); }
-  openUploadModal({ type:'link', name, url, dataUrl:null });
+
+  if (isDouyinUrl(url)) {
+    // 抖音链接自动保存为视频类型
+    let name = '抖音视频';
+    try {
+      const path = new URL(url).pathname.replace(/\/$/, '');
+      if (path && path !== '/') name = '抖音: ' + path.split('/').pop() || '抖音视频';
+    } catch(e) {}
+    openUploadModal({ type: 'video', name, url, dataUrl: null });
+  } else {
+    let name = '';
+    try { name = new URL(url).hostname.replace('www.',''); } catch(e) { name = url.slice(0,30); }
+    openUploadModal({ type:'link', name, url, dataUrl:null });
+  }
 }
 
 document.getElementById('btnAddLink').onclick = () => { handleLink(document.getElementById('linkInput').value); document.getElementById('linkInput').value = ''; };
