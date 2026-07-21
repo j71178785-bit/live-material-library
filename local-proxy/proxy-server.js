@@ -190,53 +190,143 @@ async function breakdownFramework(body, apiKey) {
     return { error: "转写文本太短，无法分析框架。请先获取或粘贴更完整的内容。" };
   }
 
-  const systemPrompt = `你是一位顶级直播带货运营专家。请对以下直播/视频内容进行完整的带货逻辑框架拆解，并标注每个阶段。
+  const systemPrompt = `你是一位顶级直播带货运营专家。请对以下直播/视频话术进行系统化的带货逻辑框架拆解。
 
-## 你要做的事情
-从带货视角拆解整场直播的逻辑推进链路，识别主播在每个阶段用了什么策略推动用户下单。
+## 拆解框架（9个模块，每个模块独立分析）
 
-## 常见带货逻辑框架参考（不限于此）：
-- 🔥 钩子开场：用福利/悬念/痛点吸引停留
-- 📦 产品种草：建立产品价值感，塑造需求
-- 💬 信任背书：专家身份/用户见证/数据对比
-- 💰 价格锚定：原价对比、限时优惠、库存紧迫
-- 🎯 逼单成交：消除犹豫、催促下单、倒计时
-- 🔄 互动留存：福袋抽奖、点赞/评论引导、转粉话术
-- 📞 售后服务：打消顾虑、退换保障、客服引导
-- 🔗 连品转款：从上一款自然过渡到下一款
+### 1. 开场留人
+判断开场手段属于哪种类型（可多选）：痛点型 / 背书型 / 机制型 / 悬念型。
+分析话术是否有效留住了用户，摘录代表性原话。
+输出字段：type（类型）、analysis（分析描述）、dialogue（原话摘录）、score（1-10分）
 
-## 对每个阶段需要标注：
-1. phase：阶段名称（带 emoji 前缀，如 "🔥 钩子开场"）
-2. timeHint：该阶段在视频中的大致时间段（如 "00:00-02:30"）
-3. content：该阶段主播说了什么、做了什么，具体描述
-4. technique：使用的带货技巧和策略分析
-5. effect：该阶段的转化效果评估（好/中/差，并说明原因）
-6. dialogue：截取该阶段最具代表性的 1-2 句原话
+### 2. 塑品（产品塑造）
+分析主播如何把产品"立起来"，覆盖以下维度各打勾并说明：
+- visual：镜头怎么展示产品（特写角度、展示方式）
+- demo：做了什么功能演示/实验/效果可视化
+- material：讲了什么材质/成分/做工细节
+- scenario：把产品放进什么场景里讲的（使用场景代入）
+- comparison：对比（和竞品比/使用前后比/和专柜比）
+输出字段：各维度 covered/未覆盖 + detail描述 + 塑品整体score
 
-## 额外输出：
-- keyPoints：3-5 个最关键的高转化话术（标出为什么有效）
-- suggestions：2-3 条可落地的优化建议
-- overallScore：整体带货逻辑评分（1-10 分）
+### 3. 痛点拆解
+三段式分析：
+- description：痛点怎么描述，说得是否精准
+- amplification：痛点如何放大（说后果/代价/紧迫感）
+- solutionAnchor：怎么把自己的产品嵌进解决方案
+每段打出 dialogue 原话，整体 score
 
-返回 JSON 格式（严格遵守）：
+### 4. 卖点讲解
+- 列出核心卖点（1-3个最突出的差异化优势）
+- 每个卖点用了什么证据/演示支撑
+- 卖点讲解的先后顺序是否合理
+输出：points列表（每项含 point、evidence、dialogue）、orderEvaluation、整体 score
+
+### 5. 价格锚定与算账
+- anchor：先报了什么价格锚（原价/专柜价/别家价）再报价
+- valueStacking：是否堆叠总价值再报福利价，落差感够不够
+- costCalculation：有没有帮算单次使用成本（算账逻辑）
+每段出 dialogue 和 score
+
+### 6. 场景造梦（愿景型促单）
+- dream：主播画了什么画面/梦
+- identity：把你投射成什么身份角色
+- emotion：调动了什么情绪（向往感/满足感/被认可…）
+- senses：有没有调动多感官描写（触感/嗅觉/视觉…）
+- socialProof：有没有嵌入社交证明（"别人会说""朋友都问链接"）
+- timing：梦绑定了什么时间点
+每项出 detail 和 dialogue，整体 score
+
+### 7. 逼单成交
+- scarcity：怎么制造稀缺感（库存/限量/排队…）
+- timeLimit：有没有时间限制节点
+- closingLine：具体成交话术（"拍下扣1""只剩最后X单"…）
+每项出 dialogue，整体 score
+
+### 8. 气口与节奏
+- speedChanges：语速变化（哪些段快、哪些段慢、时机是否合理）
+- interactionPoints：什么时机抛互动（扣1/提问/点赞引导）以及频次
+- emotionalCurve：情绪曲线描述（平铺还是有高潮起伏）
+- transitions：环节衔接过渡是否自然
+- pauses：关键成交点是否有停顿给操作时间
+整体 score
+
+### 9. 整体评价
+- overallScores：按留人能力/塑品完整度/痛点精准度/卖点清晰度/逼单力度/节奏气口 各维度打分（1-10）
+- 综合总分 overall（1-10）
+- highlights：3-5 条优秀点（做得好的地方）
+- improvements：3-5 条可落地的改进点
+
+## JSON 返回格式（严格遵守）：
 {
-  "structure": "整体带货逻辑框架描述（1-2句总结）",
-  "phases": [
-    {
-      "phase": "🔥 钩子开场",
-      "timeHint": "00:00-01:30",
-      "content": "具体内容描述",
-      "technique": "使用的带货策略",
-      "effect": "转化效果评估",
-      "dialogue": "代表性原话"
+  "structure": "整体带货逻辑一句话总结",
+  "modules": {
+    "opening": { "type": "痛点型", "analysis": "...", "dialogue": "...", "score": 8 },
+    "productBuilding": {
+      "visual": { "covered": true, "detail": "..." },
+      "demo": { "covered": true, "detail": "..." },
+      "material": { "covered": false, "detail": "" },
+      "scenario": { "covered": true, "detail": "..." },
+      "comparison": { "covered": true, "detail": "..." },
+      "score": 7
+    },
+    "painPoints": {
+      "description": { "detail": "...", "dialogue": "..." },
+      "amplification": { "detail": "...", "dialogue": "..." },
+      "solutionAnchor": { "detail": "...", "dialogue": "..." },
+      "score": 8
+    },
+    "sellingPoints": {
+      "points": [{ "point": "卖点名称", "evidence": "支撑方式", "dialogue": "原话" }],
+      "orderEvaluation": "卖点排序是否合理",
+      "score": 8
+    },
+    "priceAnchoring": {
+      "anchor": { "detail": "...", "dialogue": "..." },
+      "valueStacking": { "detail": "...", "dialogue": "..." },
+      "costCalculation": { "detail": "...", "dialogue": "..." },
+      "score": 7
+    },
+    "dreamBuilding": {
+      "dream": { "detail": "...", "dialogue": "..." },
+      "identity": { "detail": "...", "dialogue": "..." },
+      "emotion": { "detail": "...", "dialogue": "..." },
+      "senses": { "detail": "...", "dialogue": "..." },
+      "socialProof": { "detail": "...", "dialogue": "..." },
+      "timing": { "detail": "...", "dialogue": "..." },
+      "score": 8
+    },
+    "urgencyClosing": {
+      "scarcity": { "detail": "...", "dialogue": "..." },
+      "timeLimit": { "detail": "...", "dialogue": "..." },
+      "closingLine": { "detail": "...", "dialogue": "..." },
+      "score": 7
+    },
+    "rhythm": {
+      "speedChanges": "...",
+      "interactionPoints": "...",
+      "emotionalCurve": "...",
+      "transitions": "...",
+      "pauses": "...",
+      "score": 7
     }
-  ],
-  "keyPoints": ["高转化话术+原因"],
-  "suggestions": ["优化建议"],
-  "overallScore": 7
+  },
+  "overallScores": {
+    "retention": 8,
+    "productBuilding": 7,
+    "painPointAccuracy": 8,
+    "sellingPointClarity": 8,
+    "urgencyForce": 7,
+    "rhythm": 7,
+    "overall": 7
+  },
+  "highlights": ["亮点1", "亮点2", "亮点3"],
+  "improvements": ["改进点1", "改进点2", "改进点3"]
 }
 
-只返回纯 JSON，不要 markdown 代码块。`;
+## 重要规则：
+- 如果某个模块在话术中完全没有出现（如没有场景造梦），对应字段填 null，score 填 0
+- 只返回纯 JSON，不要 markdown 代码块，不要额外文字说明
+- dialogue 必须是从转写原文中摘录的真实原话，不要自己编`;
 
   const userContent = `素材：${name || "未命名"}\n${note ? "备注：" + note + "\n" : ""}\n【转写内容】\n${transcript}`;
 

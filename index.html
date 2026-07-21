@@ -241,33 +241,68 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
 .ai-transcribe-progress-fill{height:100%;background:linear-gradient(90deg,#7c5cfc,#a78bfa);border-radius:3px;transition:width .3s;width:0}
 .ai-transcribe-progress-text{font-size:11px;color:#7c5cfc;font-weight:500}
 /* 带货逻辑框架拆解 */
-.breakdown-section{display:none;margin:16px 0;border:1.5px solid #ffe8c0;border-radius:12px;padding:14px;background:#fffcf5}
+.breakdown-section{display:none;margin:16px 0;border:1.5px solid #e0e0e0;border-radius:12px;padding:16px;background:#fafafa}
 .breakdown-section.show{display:block}
-.breakdown-header{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.breakdown-header{display:flex;align-items:center;gap:6px;margin-bottom:14px}
 .breakdown-icon{font-size:18px}
-.breakdown-title{font-size:13px;font-weight:600;color:#b45309}
-.breakdown-score{font-size:16px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:auto}
+.breakdown-title{font-size:14px;font-weight:700;color:#333}
+.breakdown-score{font-size:18px;font-weight:800;padding:2px 10px;border-radius:8px;margin-left:auto}
 .breakdown-score.high{background:#dcfce7;color:#16a34a}
 .breakdown-score.mid{background:#fffbeb;color:#d97706}
 .breakdown-score.low{background:#fef2f2;color:#dc2626}
-.breakdown-structure{font-size:12px;color:#555;line-height:1.7;background:#fff7ed;border-radius:8px;padding:10px 12px;margin-bottom:10px}
-.breakdown-phases{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
-.bk-phase-card{background:#fffdf7;border:1px solid #ffe8c0;border-radius:10px;overflow:hidden}
-.bk-phase-header{display:flex;align-items:center;padding:10px 12px;cursor:pointer;transition:background .15s}
-.bk-phase-header:hover{background:#fff7ed}
-.bk-phase-timeline{font-size:11px;color:#999;min-width:70px}
-.bk-phase-label{flex:1;font-size:12px;font-weight:600;color:#92400e;margin:0 8px}
-.bk-phase-toggle{font-size:11px;color:#999;transition:transform .2s}
-.bk-phase-toggle.open{transform:rotate(180deg)}
-.bk-phase-body{display:none;padding:0 12px 12px;font-size:11px;color:#666;line-height:1.6}
-.bk-phase-body.show{display:block}
-.bk-phase-row{margin-bottom:6px}
-.bk-phase-row .bk-label{font-weight:500;color:#b45309;margin-right:4px}
-.bk-phase-dialogue{font-size:11px;color:#7c2d12;font-style:italic;background:#fef3c7;border-left:3px solid #f59e0b;padding:6px 10px;border-radius:0 6px 6px 0;margin:6px 0}
-.bk-section-title{font-size:12px;font-weight:600;color:#b45309;margin-bottom:6px}
-.breakdown-keypoints,.breakdown-suggestions{font-size:11px;line-height:1.6;margin-bottom:10px}
-.breakdown-keypoints div:not(.bk-section-title),.breakdown-suggestions div:not(.bk-section-title){color:#555;padding-left:4px}
-.breakdown-suggestions{color:#d97706}
+.breakdown-structure{font-size:12px;color:#555;line-height:1.7;background:#f0f0f0;border-radius:8px;padding:10px 14px;margin-bottom:14px}
+
+/* 9模块容器 */
+.bk-modules{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+
+/* 模块卡片 */
+.bk-module-card{background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden}
+.bk-module-card.null-module{opacity:.45}
+.bk-module-header{display:flex;align-items:center;padding:10px 14px;cursor:pointer;transition:background .15s}
+.bk-module-header:hover{background:#f5f5f5}
+.bk-module-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;margin-right:10px;flex-shrink:0}
+.bk-module-num.c1{background:#e74c3c}.bk-module-num.c2{background:#e67e22}.bk-module-num.c3{background:#8e44ad}
+.bk-module-num.c4{background:#2980b9}.bk-module-num.c5{background:#27ae60}.bk-module-num.c6{background:#d35400}
+.bk-module-num.c7{background:#c0392b}.bk-module-num.c8{background:#16a085}
+.bk-module-title{flex:1;font-size:13px;font-weight:600;color:#333;margin:0 8px}
+.bk-module-badge{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600;margin-left:6px}
+.bk-module-badge.good{background:#dcfce7;color:#16a34a}
+.bk-module-badge.mid{background:#fef3c7;color:#d97706}
+.bk-module-badge.weak{background:#fef2f2;color:#dc2626}
+.bk-module-badge.null-badge{background:#f3f4f6;color:#9ca3af}
+.bk-module-toggle{font-size:12px;color:#999;min-width:20px;text-align:center;transition:transform .2s}
+.bk-module-toggle.open{transform:rotate(180deg)}
+.bk-module-body{display:none;padding:0 14px 14px;font-size:12px;color:#555;line-height:1.7}
+
+/* 子维度行 */
+.bk-sub-row{display:flex;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #eee}
+.bk-sub-row:last-child{border-bottom:none}
+.bk-sub-label{font-size:11px;font-weight:600;color:#888;min-width:60px;flex-shrink:0;padding-top:1px}
+.bk-sub-check{font-size:11px;min-width:28px;flex-shrink:0;padding-top:1px}
+.bk-sub-check.yes{color:#16a34a}.bk-sub-check.no{color:#ccc}
+.bk-sub-detail{flex:1;color:#555}
+.bk-sub-dialogue{font-size:11px;color:#7c2d12;font-style:italic;background:#fff7ed;border-left:3px solid #f59e0b;padding:4px 10px;border-radius:0 4px 4px 0;margin-top:4px}
+
+.bk-module-body .bk-sub-dialogue{font-size:11px;color:#7c2d12;font-style:italic;background:#fff7ed;border-left:3px solid #f59e0b;padding:4px 10px;border-radius:0 4px 4px 0;margin-top:4px}
+
+/* 整体评价板块 */
+.bk-overall{margin-top:12px;background:#f8f8ff;border-radius:10px;padding:14px}
+.bk-section-title{font-size:13px;font-weight:700;color:#333;margin-bottom:10px}
+.bk-score-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:12px}
+.bk-score-item{display:flex;align-items:center;gap:8px;font-size:11px}
+.bk-score-label{color:#666;min-width:56px}
+.bk-score-bar{flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.bk-score-fill{height:100%;border-radius:3px;transition:width .4s}
+.bk-score-fill.good{background:#16a34a}.bk-score-fill.mid{background:#f59e0b}.bk-score-fill.weak{background:#dc2626}
+.bk-score-val{font-weight:700;font-size:12px;min-width:28px;text-align:right}
+.bk-highlights,.bk-improvements{margin-bottom:10px;font-size:11px;line-height:1.6}
+.bk-highlights .bk-section-title{color:#16a34a}
+.bk-improvements .bk-section-title{color:#d97706}
+.bk-hl-item,.bk-im-item{padding:3px 0 3px 12px;position:relative}
+.bk-hl-item::before{content:'✅';position:absolute;left:0;top:3px;font-size:10px}
+.bk-im-item::before{content:'⚠️';position:absolute;left:0;top:3px;font-size:10px}
+.bk-hl-item{color:#333}
+.bk-im-item{color:#555}
 .ai-adopt-btn{padding:5px 12px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;color:#059669;font-size:11px;cursor:pointer;transition:all .15s}
 .ai-adopt-btn:hover{background:#059669;color:#fff}
 
@@ -514,14 +549,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
           <span class="breakdown-score" id="breakdownScore"></span>
         </div>
         <div class="breakdown-structure" id="breakdownStructure"></div>
-        <div class="breakdown-phases" id="breakdownPhases"></div>
-        <div class="breakdown-keypoints" id="breakdownKeyPoints">
-          <div class="bk-section-title">💎 高转化话术</div>
-          <div id="breakdownKPList"></div>
-        </div>
-        <div class="breakdown-suggestions" id="breakdownSuggestions">
-          <div class="bk-section-title">💡 优化建议</div>
-          <div id="breakdownSugList"></div>
+        <!-- 9个模块卡片容器 -->
+        <div class="bk-modules" id="bkModules"></div>
+        <!-- 整体评价 -->
+        <div class="bk-overall" id="bkOverall">
+          <div class="bk-section-title">📋 整体评价</div>
+          <div class="bk-score-grid" id="bkScoreGrid"></div>
+          <div class="bk-highlights" id="bkHighlights"></div>
+          <div class="bk-improvements" id="bkImprovements"></div>
         </div>
       </div>
 
@@ -1826,63 +1861,201 @@ function escAttr(s) {
 }
 
 // 渲染带货逻辑框架拆解
+// ===========================
+// 带货逻辑框架拆解渲染（9模块）
+// ===========================
+const bkModulesConfig = [
+  { key:'opening', num:1, icon:'🔥', name:'开场留人', cls:'c1' },
+  { key:'productBuilding', num:2, icon:'📦', name:'塑品', cls:'c2' },
+  { key:'painPoints', num:3, icon:'💢', name:'痛点拆解', cls:'c3' },
+  { key:'sellingPoints', num:4, icon:'⭐', name:'卖点讲解', cls:'c4' },
+  { key:'priceAnchoring', num:5, icon:'💰', name:'价格锚定与算账', cls:'c5' },
+  { key:'dreamBuilding', num:6, icon:'🌈', name:'场景造梦', cls:'c6' },
+  { key:'urgencyClosing', num:7, icon:'🎯', name:'逼单成交', cls:'c7' },
+  { key:'rhythm', num:8, icon:'🎵', name:'气口与节奏', cls:'c8' },
+];
+
 function renderBreakdown(data) {
   const section = document.getElementById('breakdownSection');
-  if (!data) { section.classList.remove('show'); return; }
+  if (!data || !data.modules) { section.classList.remove('show'); return; }
   section.classList.add('show');
 
-  // 总分
-  const score = data.overallScore || 0;
+  // 综合评分
+  const overallScore = data.overallScores?.overall || data.overallScore || 0;
   const scoreEl = document.getElementById('breakdownScore');
-  if (score) {
-    scoreEl.textContent = score + '/10';
-    scoreEl.className = 'breakdown-score ' + (score >= 8 ? 'high' : score >= 5 ? 'mid' : 'low');
+  if (overallScore) {
+    scoreEl.textContent = overallScore.toFixed(1) + '/10';
+    const cls = overallScore >= 8 ? 'high' : overallScore >= 5 ? 'mid' : 'low';
+    scoreEl.className = 'breakdown-score ' + cls;
   } else { scoreEl.textContent = ''; }
 
   // 整体结构
-  const structEl = document.getElementById('breakdownStructure');
-  structEl.innerHTML = data.structure ? escHtml(data.structure) : '';
+  document.getElementById('breakdownStructure').innerHTML = data.structure
+    ? `<span style="font-weight:500">📝</span> ${escHtml(data.structure)}` : '';
 
-  // 各阶段拆解
-  const phasesEl = document.getElementById('breakdownPhases');
-  if (data.phases && data.phases.length) {
-    phasesEl.innerHTML = data.phases.map((p, i) => `
-      <div class="bk-phase-card">
-        <div class="bk-phase-header" onclick="toggleBkPhase(this)">
-          <span class="bk-phase-timeline">${escHtml(p.timeHint || '')}</span>
-          <span class="bk-phase-label">${escHtml(p.phase || '阶段' + (i+1))}</span>
-          <span class="bk-phase-toggle">▾</span>
+  // 9个模块
+  const modsEl = document.getElementById('bkModules');
+  const mods = data.modules;
+  modsEl.innerHTML = bkModulesConfig.map(cfg => {
+    const m = mods[cfg.key];
+    if (!m || m === null || m.score === 0) {
+      return `<div class="bk-module-card null-module">
+        <div class="bk-module-header">
+          <span class="bk-module-num ${cfg.cls}">${cfg.num}</span>
+          <span class="bk-module-title">${cfg.icon} ${cfg.name}</span>
+          <span class="bk-module-badge null-badge">未涉及</span>
         </div>
-        <div class="bk-phase-body">
-          ${p.content ? `<div class="bk-phase-row"><span class="bk-label">📋 内容：</span>${escHtml(p.content)}</div>` : ''}
-          ${p.technique ? `<div class="bk-phase-row"><span class="bk-label">🎯 策略：</span>${escHtml(p.technique)}</div>` : ''}
-          ${p.effect ? `<div class="bk-phase-row"><span class="bk-label">📈 效果：</span>${escHtml(p.effect)}</div>` : ''}
-          ${p.dialogue ? `<div class="bk-phase-dialogue">「${escHtml(p.dialogue)}」</div>` : ''}
-        </div>
+      </div>`;
+    }
+    const scoreBadge = m.score >= 8 ? '<span class="bk-module-badge good">'+m.score+'/10</span>'
+      : m.score >= 5 ? '<span class="bk-module-badge mid">'+m.score+'/10</span>'
+      : '<span class="bk-module-badge weak">'+m.score+'/10</span>';
+    return `<div class="bk-module-card">
+      <div class="bk-module-header" onclick="toggleBkModule(this)">
+        <span class="bk-module-num ${cfg.cls}">${cfg.num}</span>
+        <span class="bk-module-title">${cfg.icon} ${cfg.name}</span>
+        ${scoreBadge}
+        <span class="bk-module-toggle">▾</span>
       </div>
-    `).join('');
-  } else { phasesEl.innerHTML = ''; }
+      <div class="bk-module-body">${renderModuleBody(cfg.key, m)}</div>
+    </div>`;
+  }).join('');
 
-  // 高转化话术
-  const kpList = document.getElementById('breakdownKPList');
-  if (data.keyPoints && data.keyPoints.length) {
-    document.getElementById('breakdownKeyPoints').style.display = 'block';
-    kpList.innerHTML = data.keyPoints.map(k => `<div style="margin-bottom:4px">• ${escHtml(k)}</div>`).join('');
-  } else { document.getElementById('breakdownKeyPoints').style.display = 'none'; }
+  // 整体评价
+  const os = data.overallScores;
+  const scoreGrid = document.getElementById('bkScoreGrid');
+  const labels = {
+    retention:'留人能力', productBuilding:'塑品完整度', painPointAccuracy:'痛点精准度',
+    sellingPointClarity:'卖点清晰度', urgencyForce:'逼单力度', rhythm:'节奏/气口'
+  };
+  scoreGrid.innerHTML = Object.entries(labels).map(([k, label]) => {
+    const v = os?.[k] || 0;
+    const fillCls = v >= 8 ? 'good' : v >= 5 ? 'mid' : 'weak';
+    return `<div class="bk-score-item"><span class="bk-score-label">${label}</span>
+      <div class="bk-score-bar"><div class="bk-score-fill ${fillCls}" style="width:${v*10}%"></div></div>
+      <span class="bk-score-val">${v}</span></div>`;
+  }).join('');
 
-  // 优化建议
-  const sugList = document.getElementById('breakdownSugList');
-  if (data.suggestions && data.suggestions.length) {
-    document.getElementById('breakdownSuggestions').style.display = 'block';
-    sugList.innerHTML = data.suggestions.map(s => `<div style="margin-bottom:4px">• ${escHtml(s)}</div>`).join('');
-  } else { document.getElementById('breakdownSuggestions').style.display = 'none'; }
+  const hl = data.highlights || [];
+  const imp = data.improvements || [];
+  document.getElementById('bkHighlights').innerHTML = hl.length
+    ? '<div class="bk-section-title">✅ 优秀点</div>' + hl.map(h => `<div class="bk-hl-item">${escHtml(h)}</div>`).join('')
+    : '';
+  document.getElementById('bkImprovements').innerHTML = imp.length
+    ? '<div class="bk-section-title">⚠️ 改进点</div>' + imp.map(h => `<div class="bk-im-item">${escHtml(h)}</div>`).join('')
+    : '';
 }
 
-function toggleBkPhase(header) {
+function renderModuleBody(key, m) {
+  switch (key) {
+    case 'opening': {
+      return `<div class="bk-sub-row"><span class="bk-sub-label">类型</span><span class="bk-sub-detail">${escHtml(m.type || '')}</span></div>
+        ${m.analysis ? `<div class="bk-sub-row"><span class="bk-sub-label">分析</span><span class="bk-sub-detail">${escHtml(m.analysis)}</span></div>` : ''}
+        ${m.dialogue ? `<div class="bk-sub-dialogue">${escHtml(m.dialogue)}</div>` : ''}`;
+    }
+    case 'productBuilding': {
+      const dims = [
+        {k:'visual', label:'视觉展示'},{k:'demo', label:'功能演示'},
+        {k:'material', label:'材质工艺'},{k:'scenario', label:'场景代入'},
+        {k:'comparison', label:'对比手法'}
+      ];
+      return dims.map(d => {
+        const item = m[d.k];
+        const covered = item?.covered;
+        const detail = item?.detail || '';
+        return `<div class="bk-sub-row">
+          <span class="bk-sub-check ${covered ? 'yes' : 'no'}">${covered ? '✔' : '✘'}</span>
+          <span class="bk-sub-label">${d.label}</span>
+          <span class="bk-sub-detail">${escHtml(detail)}</span>
+        </div>`;
+      }).join('');
+    }
+    case 'painPoints': {
+      const steps = [
+        {k:'description', label:'痛点描述'},{k:'amplification', label:'痛点放大'},
+        {k:'solutionAnchor', label:'方案锚定'}
+      ];
+      return steps.map(s => {
+        const item = m[s.k] || {};
+        return `<div class="bk-sub-row"><span class="bk-sub-label">${s.label}</span>
+          <span class="bk-sub-detail">${escHtml(item.detail||'')}</span></div>
+          ${item.dialogue ? `<div class="bk-sub-dialogue">${escHtml(item.dialogue)}</div>` : ''}`;
+      }).join('');
+    }
+    case 'sellingPoints': {
+      const pts = m.points || [];
+      return pts.map((p, i) => `<div style="margin-bottom:8px;border-bottom:1px dashed #e5e7eb;padding-bottom:6px">
+        <div style="font-weight:600;color:#333;margin-bottom:2px">核心卖点${i+1}：${escHtml(p.point||'')}</div>
+        <div class="bk-sub-row"><span class="bk-sub-label">支撑方式</span><span class="bk-sub-detail">${escHtml(p.evidence||'')}</span></div>
+        ${p.dialogue ? `<div class="bk-sub-dialogue">${escHtml(p.dialogue)}</div>` : ''}
+      </div>`).join('')
+        + (m.orderEvaluation ? `<div style="color:#888;font-size:11px;margin-top:4px">📊 ${escHtml(m.orderEvaluation)}</div>` : '');
+    }
+    case 'priceAnchoring': {
+      const items = [
+        {k:'anchor', label:'价格锚定'},{k:'valueStacking', label:'价值堆叠'},
+        {k:'costCalculation', label:'算账逻辑'}
+      ];
+      return items.map(s => {
+        const item = m[s.k] || {};
+        return `<div class="bk-sub-row"><span class="bk-sub-label">${s.label}</span>
+          <span class="bk-sub-detail">${escHtml(item.detail||'')}</span></div>
+          ${item.dialogue ? `<div class="bk-sub-dialogue">${escHtml(item.dialogue)}</div>` : ''}`;
+      }).join('');
+    }
+    case 'dreamBuilding': {
+      const dims = [
+        {k:'dream', label:'造梦画面'},{k:'identity', label:'身份投射'},
+        {k:'emotion', label:'情绪唤起'},{k:'senses', label:'感官描写'},
+        {k:'socialProof', label:'社交证明'},{k:'timing', label:'时机嵌入'}
+      ];
+      return dims.map(d => {
+        const item = m[d.k] || {};
+        const has = item.detail || item.dialogue;
+        if (!has) return '';
+        return `<div class="bk-sub-row"><span class="bk-sub-label">${d.label}</span>
+          <span class="bk-sub-detail">${escHtml(item.detail||'')}</span></div>
+          ${item.dialogue ? `<div class="bk-sub-dialogue">${escHtml(item.dialogue)}</div>` : ''}`;
+      }).join('');
+    }
+    case 'urgencyClosing': {
+      const items = [
+        {k:'scarcity', label:'稀缺营造'},{k:'timeLimit', label:'限时节点'},
+        {k:'closingLine', label:'成交话术'}
+      ];
+      return items.map(s => {
+        const item = m[s.k] || {};
+        const has = item.detail || item.dialogue;
+        if (!has) return '';
+        return `<div class="bk-sub-row"><span class="bk-sub-label">${s.label}</span>
+          <span class="bk-sub-detail">${escHtml(item.detail||'')}</span></div>
+          ${item.dialogue ? `<div class="bk-sub-dialogue">${escHtml(item.dialogue)}</div>` : ''}`;
+      }).join('');
+    }
+    case 'rhythm': {
+      const dims = [
+        {k:'speedChanges', label:'语速变化'},{k:'interactionPoints', label:'互动节点'},
+        {k:'emotionalCurve', label:'情绪曲线'},{k:'transitions', label:'转场衔接'},
+        {k:'pauses', label:'留白停顿'}
+      ];
+      return dims.map(d => {
+        const val = m[d.k];
+        if (!val) return '';
+        return `<div class="bk-sub-row"><span class="bk-sub-label">${d.label}</span>
+          <span class="bk-sub-detail">${escHtml(val)}</span></div>`;
+      }).join('');
+    }
+    default: return '';
+  }
+}
+
+function toggleBkModule(header) {
   const body = header.nextElementSibling;
-  const toggle = header.querySelector('.bk-phase-toggle');
-  body.classList.toggle('show');
-  toggle.classList.toggle('open');
+  const toggle = header.querySelector('.bk-module-toggle');
+  if (body) {
+    body.style.display = body.style.display === 'block' ? 'none' : 'block';
+    toggle.classList.toggle('open', body.style.display === 'block');
+  }
 }
 
 // ===========================
