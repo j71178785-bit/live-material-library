@@ -240,6 +240,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
 .ai-transcribe-progress-bar{width:100%;height:6px;background:#e8e0ff;border-radius:3px;overflow:hidden;margin-bottom:6px}
 .ai-transcribe-progress-fill{height:100%;background:linear-gradient(90deg,#7c5cfc,#a78bfa);border-radius:3px;transition:width .3s;width:0}
 .ai-transcribe-progress-text{font-size:11px;color:#7c5cfc;font-weight:500}
+/* 带货逻辑框架拆解 */
+.breakdown-section{display:none;margin:16px 0;border:1.5px solid #ffe8c0;border-radius:12px;padding:14px;background:#fffcf5}
+.breakdown-section.show{display:block}
+.breakdown-header{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.breakdown-icon{font-size:18px}
+.breakdown-title{font-size:13px;font-weight:600;color:#b45309}
+.breakdown-score{font-size:16px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:auto}
+.breakdown-score.high{background:#dcfce7;color:#16a34a}
+.breakdown-score.mid{background:#fffbeb;color:#d97706}
+.breakdown-score.low{background:#fef2f2;color:#dc2626}
+.breakdown-structure{font-size:12px;color:#555;line-height:1.7;background:#fff7ed;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.breakdown-phases{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.bk-phase-card{background:#fffdf7;border:1px solid #ffe8c0;border-radius:10px;overflow:hidden}
+.bk-phase-header{display:flex;align-items:center;padding:10px 12px;cursor:pointer;transition:background .15s}
+.bk-phase-header:hover{background:#fff7ed}
+.bk-phase-timeline{font-size:11px;color:#999;min-width:70px}
+.bk-phase-label{flex:1;font-size:12px;font-weight:600;color:#92400e;margin:0 8px}
+.bk-phase-toggle{font-size:11px;color:#999;transition:transform .2s}
+.bk-phase-toggle.open{transform:rotate(180deg)}
+.bk-phase-body{display:none;padding:0 12px 12px;font-size:11px;color:#666;line-height:1.6}
+.bk-phase-body.show{display:block}
+.bk-phase-row{margin-bottom:6px}
+.bk-phase-row .bk-label{font-weight:500;color:#b45309;margin-right:4px}
+.bk-phase-dialogue{font-size:11px;color:#7c2d12;font-style:italic;background:#fef3c7;border-left:3px solid #f59e0b;padding:6px 10px;border-radius:0 6px 6px 0;margin:6px 0}
+.bk-section-title{font-size:12px;font-weight:600;color:#b45309;margin-bottom:6px}
+.breakdown-keypoints,.breakdown-suggestions{font-size:11px;line-height:1.6;margin-bottom:10px}
+.breakdown-keypoints div:not(.bk-section-title),.breakdown-suggestions div:not(.bk-section-title){color:#555;padding-left:4px}
+.breakdown-suggestions{color:#d97706}
 .ai-adopt-btn{padding:5px 12px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;color:#059669;font-size:11px;cursor:pointer;transition:all .15s}
 .ai-adopt-btn:hover{background:#059669;color:#fff}
 
@@ -475,6 +503,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
             <span>AI 分析中…</span>
           </div>
           <div id="aiResultContent"></div>
+        </div>
+      </div>
+
+      <!-- 带货逻辑框架拆解 -->
+      <div class="breakdown-section" id="breakdownSection">
+        <div class="breakdown-header">
+          <span class="breakdown-icon">📊</span>
+          <span class="breakdown-title">带货逻辑框架拆解</span>
+          <span class="breakdown-score" id="breakdownScore"></span>
+        </div>
+        <div class="breakdown-structure" id="breakdownStructure"></div>
+        <div class="breakdown-phases" id="breakdownPhases"></div>
+        <div class="breakdown-keypoints" id="breakdownKeyPoints">
+          <div class="bk-section-title">💎 高转化话术</div>
+          <div id="breakdownKPList"></div>
+        </div>
+        <div class="breakdown-suggestions" id="breakdownSuggestions">
+          <div class="bk-section-title">💡 优化建议</div>
+          <div id="breakdownSugList"></div>
         </div>
       </div>
 
@@ -1195,6 +1242,8 @@ function openDetailModal(id) {
     aiResultEl.classList.remove('show');
     aiContentEl.innerHTML = '';
   }
+  // 带货逻辑框架拆解
+  renderBreakdown(m.aiBreakdown || null);
   document.getElementById('aiTranscript').value = m.aiTranscript || '';
 
   document.getElementById('detailModal').style.display = 'flex';
@@ -1670,6 +1719,21 @@ async function autoProcessVideo(id, file) {
       saveData(materials);
     }
 
+    // 步骤 5/5: 带货逻辑框架拆解
+    updateBgTask(taskId, 93, '📊 正在拆解带货逻辑框架...');
+
+    const bResult = await callAiApi('breakdown', {
+      name: m.name,
+      cat: m.cat,
+      note: m.note || '',
+      transcript: transcript,
+    });
+
+    if (bResult.data) {
+      m.aiBreakdown = bResult.data;
+      saveData(materials);
+    }
+
     // 完成
     finishBgTask(taskId, true);
     showToast('✓ 「' + m.name + '」AI 处理完成，点击后台面板「查看」');
@@ -1759,6 +1823,66 @@ function escHtml(s) {
 }
 function escAttr(s) {
   return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// 渲染带货逻辑框架拆解
+function renderBreakdown(data) {
+  const section = document.getElementById('breakdownSection');
+  if (!data) { section.classList.remove('show'); return; }
+  section.classList.add('show');
+
+  // 总分
+  const score = data.overallScore || 0;
+  const scoreEl = document.getElementById('breakdownScore');
+  if (score) {
+    scoreEl.textContent = score + '/10';
+    scoreEl.className = 'breakdown-score ' + (score >= 8 ? 'high' : score >= 5 ? 'mid' : 'low');
+  } else { scoreEl.textContent = ''; }
+
+  // 整体结构
+  const structEl = document.getElementById('breakdownStructure');
+  structEl.innerHTML = data.structure ? escHtml(data.structure) : '';
+
+  // 各阶段拆解
+  const phasesEl = document.getElementById('breakdownPhases');
+  if (data.phases && data.phases.length) {
+    phasesEl.innerHTML = data.phases.map((p, i) => `
+      <div class="bk-phase-card">
+        <div class="bk-phase-header" onclick="toggleBkPhase(this)">
+          <span class="bk-phase-timeline">${escHtml(p.timeHint || '')}</span>
+          <span class="bk-phase-label">${escHtml(p.phase || '阶段' + (i+1))}</span>
+          <span class="bk-phase-toggle">▾</span>
+        </div>
+        <div class="bk-phase-body">
+          ${p.content ? `<div class="bk-phase-row"><span class="bk-label">📋 内容：</span>${escHtml(p.content)}</div>` : ''}
+          ${p.technique ? `<div class="bk-phase-row"><span class="bk-label">🎯 策略：</span>${escHtml(p.technique)}</div>` : ''}
+          ${p.effect ? `<div class="bk-phase-row"><span class="bk-label">📈 效果：</span>${escHtml(p.effect)}</div>` : ''}
+          ${p.dialogue ? `<div class="bk-phase-dialogue">「${escHtml(p.dialogue)}」</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } else { phasesEl.innerHTML = ''; }
+
+  // 高转化话术
+  const kpList = document.getElementById('breakdownKPList');
+  if (data.keyPoints && data.keyPoints.length) {
+    document.getElementById('breakdownKeyPoints').style.display = 'block';
+    kpList.innerHTML = data.keyPoints.map(k => `<div style="margin-bottom:4px">• ${escHtml(k)}</div>`).join('');
+  } else { document.getElementById('breakdownKeyPoints').style.display = 'none'; }
+
+  // 优化建议
+  const sugList = document.getElementById('breakdownSugList');
+  if (data.suggestions && data.suggestions.length) {
+    document.getElementById('breakdownSuggestions').style.display = 'block';
+    sugList.innerHTML = data.suggestions.map(s => `<div style="margin-bottom:4px">• ${escHtml(s)}</div>`).join('');
+  } else { document.getElementById('breakdownSuggestions').style.display = 'none'; }
+}
+
+function toggleBkPhase(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.bk-phase-toggle');
+  body.classList.toggle('show');
+  toggle.classList.toggle('open');
 }
 
 // ===========================
