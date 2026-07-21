@@ -326,45 +326,31 @@ WebSocket.prototype.sendJSON = function (obj) {
   this.send(JSON.stringify(obj));
 };
 
-// 分块发送 PCM 音频
-function sendPCM(pcmBuffer, ws, taskId) {
-  const CHUNK = 3200; // 100ms @ 16kHz/16bit/mono
-  let offset = 0;
-  let stopped = false;
+// 分块发送 PCM 音频（快速发送，不再等待实时时间）
+async function sendPCM(pcmBuffer, ws, taskId) {
+  const CHUNK = 64000; // 约 2 秒音频 @ 16kHz/16bit/mono
+  const start = Date.now();
 
-  function sendNext() {
-    if (stopped) return;
-    if (ws.readyState !== 1) { // 1 = OPEN
-      stopped = true;
+  for (let offset = 0; offset < pcmBuffer.length; offset += CHUNK) {
+    if (ws.readyState !== 1) {
+      console.log("  [转写] WebSocket 已断开，停止发送");
       return;
     }
-    if (offset >= pcmBuffer.length) {
-      console.log(`  [转写] 音频发送完毕, 共 ${pcmBuffer.length} 字节`);
-      try {
-        if (ws.readyState === 1) {
-          ws.sendJSON({
-            header: { action: "finish-task", task_id: taskId, streaming: "duplex" },
-            payload: { input: {} },
-          });
-        }
-      } catch (e) {
-        console.error("  [转写] 发送 finish-task 失败:", e.message);
-      }
-      stopped = true;
-      return;
-    }
-    try {
-      const end = Math.min(offset + CHUNK, pcmBuffer.length);
-      ws.send(pcmBuffer.slice(offset, end));
-      offset = end;
-      setTimeout(sendNext, 100);
-    } catch (e) {
-      console.error("  [转写] 发送音频块失败:", e.message);
-      stopped = true;
-    }
+    const end = Math.min(offset + CHUNK, pcmBuffer.length);
+    ws.send(pcmBuffer.slice(offset, end));
+    // 极小延迟让出事件循环，同时避免 TCP 发送缓冲区塞满
+    await sleep(5);
   }
 
-  sendNext();
+  const elapsed = Date.now() - start;
+  console.log(`  [转写] 音频发送完毕, 共 ${(pcmBuffer.length/1024/1024).toFixed(2)} MB, 耗时 ${elapsed}ms`);
+
+  if (ws.readyState === 1) {
+    ws.sendJSON({
+      header: { action: "finish-task", task_id: taskId, streaming: "duplex" },
+      payload: { input: {} },
+    });
+  }
 }
 
 // ===========================

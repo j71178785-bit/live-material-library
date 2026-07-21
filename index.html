@@ -1830,6 +1830,8 @@ async function extractAudioFromFile(file, onProgress) {
 
   const duration = media.duration || 0;
   const sampleRate = 16000;
+  media.muted = true; // 静音避免干扰
+  media.playbackRate = 16; // 16 倍速快速提取音频
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
   const source = audioCtx.createMediaElementSource(media);
 
@@ -1853,7 +1855,6 @@ async function extractAudioFromFile(file, onProgress) {
   processor.connect(gain);
   gain.connect(audioCtx.destination);
 
-  media.playbackRate = 1;
   await media.play();
 
   await new Promise(resolve => {
