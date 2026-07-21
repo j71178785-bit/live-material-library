@@ -12,6 +12,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { WebSocket } = require("ws");
 
 // 读取 .env 文件
 function loadEnv() {
@@ -337,10 +338,9 @@ async function sendPCM(pcmBuffer, ws, taskId) {
       return;
     }
     const end = Math.min(offset + CHUNK, pcmBuffer.length);
-    // 确保发送的是 Buffer 类型，避免 ws 库将 Uint8Array 误转为字符串
-    const chunk = Buffer.isBuffer(pcmBuffer)
-      ? pcmBuffer.slice(offset, end)
-      : Buffer.from(pcmBuffer.slice(offset, end));
+    // 显式转换为 Uint8Array 再发送，避免 ws 库或 Node.js 实验性 WebSocket
+    // 将 Buffer 误作字符串处理，导致音频数据被 UTF-8 解码后触发 ByteString 错误
+    const chunk = new Uint8Array(pcmBuffer.slice(offset, end));
     ws.send(chunk);
     // 极小延迟让出事件循环，同时避免 TCP 发送缓冲区塞满
     await sleep(5);

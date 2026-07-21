@@ -1,0 +1,14 @@
+{
+  "name": "local-proxy",
+  "version": "1.0.0",
+  "description": "本地 AI 代理服务器 — 素材库 AI 功能",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ws": "^8.18.1"
+  }
+}
