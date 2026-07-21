@@ -544,6 +544,7 @@ let currentSearch = '';
 let currentSort = 'newest';
 let activeTagFilters = new Set(); // tags currently filtered
 let pendingItem = null;
+let pendingVideoFile = null;
 let pendingUploadTags = [];
 let currentDetailId = null;
 let detailTags = [];
@@ -902,7 +903,12 @@ function openUploadModal(item) {
 
   const detectedCat = detectCat(item.type, item.name, item.url);
   document.getElementById('uploadCat').value = detectedCat;
-  document.getElementById('uploadSuggest').innerHTML = `<div class="suggest-badge">✨ 自动识别：${catI(detectedCat)} ${catL(detectedCat)}</div>`;
+
+  let suggestHtml = `<div class="suggest-badge">✨ 自动识别：${catI(detectedCat)} ${catL(detectedCat)}</div>`;
+  if (item.type === 'video' && getWorkerUrl()) {
+    suggestHtml += `<div class="suggest-badge" style="background:#f0fdf4;color:#059669;margin-top:4px">⚡ AI 已连接，保存后将自动转写 + 分析话术 + 推荐标签</div>`;
+  }
+  document.getElementById('uploadSuggest').innerHTML = suggestHtml;
 
   // tag input
   const wrap = document.getElementById('uploadTagWrap');
@@ -932,11 +938,11 @@ function openUploadModal(item) {
   setTimeout(() => document.getElementById('uploadNote').focus(), 100);
 }
 
-function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; pendingItem = null; }
+function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; pendingItem = null; pendingVideoFile = null; }
 
 document.getElementById('uploadClose').onclick = closeUploadModal;
 document.getElementById('uploadCancel').onclick = closeUploadModal;
-document.getElementById('uploadConfirm').onclick = () => {
+document.getElementById('uploadConfirm').onclick = async () => {
   if (!pendingItem) return;
   const item = {
     ...pendingItem,
@@ -949,9 +955,19 @@ document.getElementById('uploadConfirm').onclick = () => {
   };
   materials.unshift(item);
   saveData(materials);
+
+  // 视频 + AI 已连接 → 自动一键处理
+  const shouldAutoProcess = item.type === 'video' && pendingVideoFile && getWorkerUrl();
   closeUploadModal();
   render();
-  showToast('✓ 素材已入库');
+
+  if (shouldAutoProcess) {
+    showToast('✓ 素材已入库，正在启动 AI 自动处理…');
+    await autoProcessVideo(item.id, pendingVideoFile);
+  } else {
+    showToast('✓ 素材已入库');
+  }
+  pendingVideoFile = null;
 };
 
 // ===========================
@@ -971,6 +987,7 @@ function handleFiles(files) {
       reader.onload = e => { openUploadModal({ type:'image', name:file.name, dataUrl:e.target.result }); };
       reader.readAsDataURL(file);
     } else {
+      pendingVideoFile = file; // 保存视频文件引用，供一键 AI 处理使用
       openUploadModal({ type:'video', name:file.name, dataUrl:null });
     }
   }
@@ -1264,6 +1281,147 @@ async function callAiApi(action, payload) {
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
   return data;
+}
+
+// 调用 Worker API
+async function callAiApi(action, payload) {
+  const workerUrl = getWorkerUrl();
+  if (!workerUrl) {
+    throw new Error('请先在「AI 设置」中填写 Worker URL');
+  }
+  const resp = await fetch(workerUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ===========================
+// 一键 AI 自动处理：上传视频后自动完成转写 + 分析 + 标签推荐
+// ===========================
+async function autoProcessVideo(id, file) {
+  const m = materials.find(x => x.id === id);
+  if (!m) return;
+
+  // 打开详情弹窗（让用户看到实时进度）
+  openDetailModal(id);
+
+  const btn = document.getElementById('aiTranscribeBtn');
+  const progEl = document.getElementById('aiTranscribeProgress');
+  const fillEl = document.getElementById('aiTranscribeProgressFill');
+  const textEl = document.getElementById('aiTranscribeProgressText');
+  const transcriptEl = document.getElementById('aiTranscript');
+  const resultEl = document.getElementById('aiResult');
+  const loadingEl = document.getElementById('aiLoading');
+  const contentEl = document.getElementById('aiResultContent');
+
+  let transcript = '';
+
+  try {
+    btn.style.display = 'none'; // 隐藏手动转写按钮，自动处理中
+
+    // 步骤 1: 提取音频
+    progEl.classList.add('show');
+    fillEl.style.width = '10%';
+    fillEl.style.background = '#7c5cfc';
+    textEl.textContent = '🔊 步骤 1/4: 正在提取音频...';
+
+    const wavBlob = await extractAudioFromFile(file, (progress, msg) => {
+      fillEl.style.width = (10 + progress * 35) + '%'; // 10% ~ 45%
+      textEl.textContent = '🔊 步骤 1/4: ' + msg;
+    });
+
+    // 步骤 2: 转写
+    fillEl.style.width = '50%';
+    textEl.textContent = '📝 步骤 2/4: 正在语音识别...';
+
+    const reader = new FileReader();
+    const base64 = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(wavBlob);
+    });
+
+    fillEl.style.width = '60%';
+    textEl.textContent = '📝 步骤 2/4: AI 正在识别语音...';
+
+    const tResult = await callAiApi('transcribe', { audioBase64: base64, format: 'wav' });
+    transcript = tResult.transcript || tResult.data?.transcript || '';
+
+    if (transcript) {
+      transcriptEl.value = transcript;
+      m.aiTranscript = transcript;
+      saveData(materials);
+    }
+
+    // 步骤 3: 分析内容（话术拆解 + 框架）
+    fillEl.style.width = '75%';
+    textEl.textContent = '🧠 步骤 3/4: 正在分析直播话术与框架...';
+
+    resultEl.classList.add('show');
+    loadingEl.style.display = 'flex';
+    contentEl.innerHTML = '';
+
+    const aResult = await callAiApi('analyze', {
+      name: m.name,
+      cat: m.cat,
+      note: m.note || '',
+      transcript: transcript,
+    });
+
+    loadingEl.style.display = 'none';
+    m.aiResult = aResult.data;
+    saveData(materials);
+
+    // 步骤 4: 推荐标签
+    fillEl.style.width = '90%';
+    textEl.textContent = '🏷 步骤 4/4: 正在推荐标签...';
+
+    const sResult = await callAiApi('suggest-tags', {
+      name: m.name,
+      cat: m.cat,
+      note: m.note || '',
+      transcript: transcript,
+    });
+
+    const suggestedTags = sResult.data?.tags || [];
+    if (suggestedTags.length && detailTagCtrl) {
+      const current = detailTagCtrl.getTags();
+      const newTags = [...new Set([...current, ...suggestedTags])];
+      detailTagCtrl.setTags(newTags);
+      m.tags = newTags;
+      saveData(materials);
+    }
+
+    // 渲染完整结果（包含标签）
+    renderAiResult({
+      ...aResult,
+      data: { ...aResult.data, tags: suggestedTags }
+    });
+
+    // 完成
+    fillEl.style.width = '100%';
+    textEl.textContent = '✓ AI 自动处理完成！';
+    setTimeout(() => progEl.classList.remove('show'), 3000);
+    showToast('✓ 视频已自动转写 + 话术分析 + 标签推荐完成');
+
+  } catch (err) {
+    console.error('自动处理失败:', err);
+    fillEl.style.width = '100%';
+    fillEl.style.background = '#dc2626';
+    textEl.textContent = '❌ 处理失败: ' + err.message;
+    loadingEl.style.display = 'none';
+    showToast('自动处理失败: ' + err.message);
+    setTimeout(() => {
+      progEl.classList.remove('show');
+      fillEl.style.background = '#7c5cfc';
+    }, 5000);
+  } finally {
+    btn.style.display = ''; // 恢复手动转写按钮
+  }
 }
 
 // 渲染 AI 分析结果
