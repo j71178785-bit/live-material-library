@@ -35,11 +35,12 @@ loadEnv();
 
 const PORT = 3000;
 const DASHSCOPE_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const DASHSCOPE_NATIVE = "https://dashscope.aliyuncs.com/api/v1";
 
 // CORS 头
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Max-Age": "86400",
 };
@@ -51,6 +52,10 @@ function sendJson(res, data, status = 200) {
     ...CORS_HEADERS,
   });
   res.end(body);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -214,6 +219,138 @@ async function breakdownFramework(body, apiKey) {
   );
 }
 
+/**
+ * 功能4：语音转写（视频/音频 → 文字）
+ * 使用 DashScope Paraformer-v2 语音识别 API
+ *
+ * 流程：base64 音频 → 上传 DashScope → 提交转写任务 → 轮询结果 → 返回文字
+ */
+async function transcribeAudio(body, apiKey) {
+  const { audioBase64, format = "wav" } = body;
+
+  if (!audioBase64) {
+    return { error: "没有音频数据" };
+  }
+
+  // base64 → Buffer
+  const audioBuffer = Buffer.from(audioBase64, "base64");
+  console.log(`  [转写] 收到音频: ${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB, 格式: ${format}`);
+
+  // Step 1: 上传音频文件到 DashScope
+  console.log("  [转写] Step 1: 上传音频文件...");
+  const blob = new Blob([audioBuffer], { type: `audio/${format}` });
+  const formData = new FormData();
+  formData.append("file", blob, `audio.${format}`);
+  formData.append("purpose", "file-extract");
+
+  const uploadResp = await fetch(`${DASHSCOPE_NATIVE}/uploads`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  });
+
+  if (!uploadResp.ok) {
+    const errText = await uploadResp.text();
+    console.error("  [转写] 上传失败:", uploadResp.status, errText);
+    throw new Error(`音频上传失败 (${uploadResp.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const uploadData = await uploadResp.json();
+  const fileUrl = uploadData.data?.url;
+
+  if (!fileUrl) {
+    console.error("  [转写] 上传返回异常:", JSON.stringify(uploadData));
+    throw new Error("音频上传成功但未返回文件 URL: " + JSON.stringify(uploadData).slice(0, 300));
+  }
+
+  console.log("  [转写] 上传成功, URL:", fileUrl.slice(0, 80) + "...");
+
+  // Step 2: 提交 Paraformer-v2 转写任务
+  console.log("  [转写] Step 2: 提交转写任务...");
+  const taskResp = await fetch(`${DASHSCOPE_NATIVE}/services/audio/asr/transcription`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify({
+      model: "paraformer-v2",
+      input: {
+        file_urls: [fileUrl],
+      },
+      parameters: {
+        language_hints: ["zh", "en"],
+      },
+    }),
+  });
+
+  if (!taskResp.ok) {
+    const errText = await taskResp.text();
+    console.error("  [转写] 提交任务失败:", taskResp.status, errText);
+    throw new Error(`创建转写任务失败 (${taskResp.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const taskData = await taskResp.json();
+  const taskId = taskData.output?.task_id;
+
+  if (!taskId) {
+    console.error("  [转写] 任务创建异常:", JSON.stringify(taskData));
+    throw new Error("转写任务创建失败: " + JSON.stringify(taskData).slice(0, 300));
+  }
+
+  console.log("  [转写] 任务已创建, ID:", taskId);
+
+  // Step 3: 轮询任务状态（最多等待 3 分钟）
+  console.log("  [转写] Step 3: 等待转写完成...");
+  for (let i = 0; i < 60; i++) {
+    await sleep(3000); // 每 3 秒查询一次
+
+    const pollResp = await fetch(`${DASHSCOPE_NATIVE}/tasks/${taskId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (!pollResp.ok) {
+      console.error("  [转写] 轮询失败:", pollResp.status);
+      continue;
+    }
+
+    const pollData = await pollResp.json();
+    const status = pollData.output?.task_status;
+    console.log(`  [转写] 轮询 #${i + 1}: ${status}`);
+
+    if (status === "SUCCEEDED") {
+      // Step 4: 获取转写结果
+      const transcriptionUrl = pollData.output?.results?.[0]?.transcription_url;
+      if (!transcriptionUrl) {
+        throw new Error("转写成功但未返回结果 URL");
+      }
+
+      console.log("  [转写] Step 4: 获取转写结果...");
+      const transcriptResp = await fetch(transcriptionUrl);
+      const transcriptData = await transcriptResp.json();
+
+      // Paraformer 返回格式: { transcripts: [{ text: "...", sentences: [...] }] }
+      const text = transcriptData.transcripts?.[0]?.text || "";
+
+      if (!text) {
+        throw new Error("转写结果为空");
+      }
+
+      console.log(`  [转写] 完成! 文字长度: ${text.length}`);
+      return { success: true, transcript: text };
+    } else if (status === "FAILED") {
+      const errMsg = pollData.output?.message || "转写任务失败";
+      throw new Error("转写失败: " + errMsg);
+    }
+    // PENDING / RUNNING → 继续等待
+  }
+
+  throw new Error("转写超时（等待超过 3 分钟）");
+}
+
 // 创建 HTTP 服务器
 const server = http.createServer(async (req, res) => {
   // CORS 预检
@@ -266,6 +403,9 @@ const server = http.createServer(async (req, res) => {
       case "breakdown":
         result = await breakdownFramework(parsed, apiKey);
         break;
+      case "transcribe":
+        result = await transcribeAudio(parsed, apiKey);
+        break;
       default:
         sendJson(res, { error: "未知操作: " + action }, 400);
         return;
@@ -273,9 +413,14 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, result);
   } catch (err) {
+    console.error("  [错误]", err.message);
     sendJson(res, { error: err.message || "服务器内部错误" }, 500);
   }
 });
+
+// 增加超时时间到 5 分钟（转写可能需要较长时间）
+server.timeout = 300000;
+server.keepAliveTimeout = 300000;
 
 server.listen(PORT, () => {
   const apiKey = process.env.AI_API_KEY;
@@ -283,6 +428,7 @@ server.listen(PORT, () => {
   console.log(`  │  AI 代理服务器已启动                          │`);
   console.log(`  │  地址: http://localhost:${PORT}                  │`);
   console.log(`  │  API Key: ${apiKey ? "已配置 ✓" : "未配置 ✗ (请编辑 .env)"}            │`);
+  console.log(`  │  功能: 文字分析 / 标签推荐 / 语音转写          │`);
   console.log(`  └─────────────────────────────────────────────┘`);
   console.log(`\n  按 Ctrl+C 停止服务器\n`);
 });

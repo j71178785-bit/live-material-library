@@ -232,6 +232,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
 @keyframes spin{to{transform:rotate(360deg)}}
 .ai-error{font-size:12px;color:#dc2626;background:#fef2f2;border-radius:8px;padding:8px 11px;margin-top:8px}
 .ai-actions{display:flex;gap:8px;margin-top:10px}
+.ai-transcribe-btn{display:inline-block;padding:4px 10px;font-size:11px;border-radius:8px;background:#f0ebff;color:#7c5cfc;border:1px solid #c4b5fd;cursor:pointer;transition:all .15s;margin-left:6px;font-weight:500}
+.ai-transcribe-btn:hover{background:#7c5cfc;color:#fff}
+.ai-transcribe-btn:disabled{opacity:.5;cursor:not-allowed}
+.ai-transcribe-progress{margin-top:8px;display:none}
+.ai-transcribe-progress.show{display:block}
+.ai-transcribe-progress-bar{width:100%;height:6px;background:#e8e0ff;border-radius:3px;overflow:hidden;margin-bottom:6px}
+.ai-transcribe-progress-fill{height:100%;background:linear-gradient(90deg,#7c5cfc,#a78bfa);border-radius:3px;transition:width .3s;width:0}
+.ai-transcribe-progress-text{font-size:11px;color:#7c5cfc;font-weight:500}
 .ai-adopt-btn{padding:5px 12px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;color:#059669;font-size:11px;cursor:pointer;transition:all .15s}
 .ai-adopt-btn:hover{background:#059669;color:#fff}
 
@@ -414,8 +422,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue'
           <span class="ai-badge" id="aiStatusBadge">未连接</span>
         </div>
         <div class="fg">
-          <label class="fl">转写文本 / 内容描述（可选，用于视频框架拆解）</label>
-          <textarea class="ai-transcript" id="aiTranscript" placeholder="粘贴视频转写文本，或描述素材内容…"></textarea>
+          <label class="fl">
+            转写文本 / 内容描述
+            <span class="ai-transcribe-btn" id="aiTranscribeBtn">🎤 从视频转写</span>
+          </label>
+          <textarea class="ai-transcript" id="aiTranscript" placeholder="粘贴视频转写文本，或点击上方按钮从视频自动转写…"></textarea>
+        </div>
+        <div class="ai-transcribe-progress" id="aiTranscribeProgress">
+          <div class="ai-transcribe-progress-bar"><div class="ai-transcribe-progress-fill" id="aiTranscribeProgressFill"></div></div>
+          <span class="ai-transcribe-progress-text" id="aiTranscribeProgressText">准备中...</span>
         </div>
         <div style="display:flex;gap:8px">
           <button class="ai-btn" id="aiAnalyzeBtn">分析内容</button>
@@ -1330,6 +1345,237 @@ function escHtml(s) {
 function escAttr(s) {
   return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+// ===========================
+// 语音转写：从视频/音频文件提取音频 → WAV → 发送到代理 → 返回文字
+// ===========================
+
+// WAV 编码：Float32 PCM → 16-bit PCM WAV
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  function writeStr(off, s) { for (let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); }
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);   // PCM
+  view.setUint16(22, 1, true);   // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  let off = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    off += 2;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+// 从文件提取音频为 WAV Blob
+async function extractAudioFromFile(file, onProgress) {
+  onProgress(0.05, '正在解码音频...');
+
+  // 方法 1：尝试用 AudioContext.decodeAudioData（快速，不需要实时播放）
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer.slice(0));
+    await tmpCtx.close();
+
+    // 降混为单声道
+    const numFrames = audioBuffer.length;
+    const mono = new Float32Array(numFrames);
+    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+      const data = audioBuffer.getChannelData(ch);
+      for (let i = 0; i < numFrames; i++) mono[i] += data[i] / audioBuffer.numberOfChannels;
+    }
+
+    onProgress(0.5, '音频提取完成，准备转写...');
+    return encodeWAV(mono, 16000);
+  } catch (e) {
+    console.log('decodeAudioData 失败，尝试实时提取:', e.message);
+  }
+
+  // 方法 2：实时播放 + ScriptProcessorNode 捕获（兼容性更好）
+  onProgress(0.1, '正在播放视频提取音频...');
+
+  const url = URL.createObjectURL(file);
+  const isVideo = file.type.startsWith('video/');
+  const media = document.createElement(isVideo ? 'video' : 'audio');
+  media.src = url;
+  media.preload = 'auto';
+  media.crossOrigin = 'anonymous';
+
+  await new Promise((resolve, reject) => {
+    media.onloadedmetadata = resolve;
+    media.onerror = () => reject(new Error('无法加载媒体文件'));
+  });
+
+  const duration = media.duration || 0;
+  const sampleRate = 16000;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+  const source = audioCtx.createMediaElementSource(media);
+
+  const bufferSize = 8192;
+  const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+  const chunks = [];
+
+  processor.onaudioprocess = (e) => {
+    const input = e.inputBuffer.getChannelData(0);
+    chunks.push(new Float32Array(input));
+    if (duration > 0) {
+      const p = Math.min(0.9, 0.1 + (media.currentTime / duration) * 0.8);
+      onProgress(p, `正在提取音频... ${Math.round(p * 100)}%`);
+    }
+  };
+
+  // source → processor → gain(0) → destination（静音播放，但捕获音频数据）
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0;
+  source.connect(processor);
+  processor.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  media.playbackRate = 1;
+  await media.play();
+
+  await new Promise(resolve => {
+    media.onended = resolve;
+  });
+
+  processor.disconnect();
+  source.disconnect();
+  gain.disconnect();
+  await audioCtx.close();
+  URL.revokeObjectURL(url);
+
+  onProgress(0.95, '音频提取完成，准备转写...');
+
+  // 合并所有 chunk
+  const total = chunks.reduce((a, c) => a + c.length, 0);
+  const merged = new Float32Array(total);
+  let off = 0;
+  for (const c of chunks) { merged.set(c, off); off += c.length; }
+
+  return encodeWAV(merged, sampleRate);
+}
+
+// 转写按钮点击处理
+let isTranscribing = false;
+document.getElementById('aiTranscribeBtn').onclick = async () => {
+  if (isTranscribing) return;
+  if (!currentDetailId) return;
+
+  const m = materials.find(x => x.id === currentDetailId);
+  if (!m) return;
+
+  // 检查代理服务器是否配置
+  const workerUrl = getWorkerUrl();
+  if (!workerUrl) {
+    showToast('请先在「AI 设置」中配置代理地址');
+    return;
+  }
+
+  // 打开文件选择器
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'video/*,audio/*';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    isTranscribing = true;
+    const btn = document.getElementById('aiTranscribeBtn');
+    const progEl = document.getElementById('aiTranscribeProgress');
+    const fillEl = document.getElementById('aiTranscribeProgressFill');
+    const textEl = document.getElementById('aiTranscribeProgressText');
+    const transcriptEl = document.getElementById('aiTranscript');
+
+    btn.textContent = '⏳ 转写中...';
+    btn.style.opacity = '0.6';
+    progEl.classList.add('show');
+    fillEl.style.width = '0%';
+    textEl.textContent = '准备中...';
+
+    try {
+      // Step 1: 提取音频
+      textEl.textContent = '正在提取音频...';
+      const wavBlob = await extractAudioFromFile(file, (progress, msg) => {
+        fillEl.style.width = (progress * 50) + '%';
+        textEl.textContent = msg;
+      });
+
+      fillEl.style.width = '55%';
+      textEl.textContent = '正在上传音频到服务器...';
+
+      // Step 2: base64 编码
+      const reader = new FileReader();
+      const base64 = await new Promise((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result;
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(wavBlob);
+      });
+
+      fillEl.style.width = '60%';
+      textEl.textContent = 'AI 正在识别语音...（可能需要 1-2 分钟）';
+
+      // Step 3: 发送到代理服务器
+      const result = await callAiApi('transcribe', {
+        audioBase64: base64,
+        format: 'wav',
+      });
+
+      fillEl.style.width = '100%';
+      textEl.textContent = '✓ 转写完成!';
+
+      // Step 4: 填入文本框
+      const transcript = result.transcript || result.data?.transcript || '';
+      if (transcript) {
+        transcriptEl.value = transcript;
+        showToast('✓ 语音转写完成，文字已填入');
+        // 自动保存
+        m.aiTranscript = transcript;
+        saveData(materials);
+      } else {
+        throw new Error('转写返回为空');
+      }
+
+      // 2 秒后隐藏进度条
+      setTimeout(() => {
+        progEl.classList.remove('show');
+      }, 2000);
+
+    } catch (err) {
+      console.error('转写失败:', err);
+      textEl.textContent = '❌ ' + err.message;
+      fillEl.style.width = '100%';
+      fillEl.style.background = '#dc2626';
+      showToast('转写失败: ' + err.message);
+      setTimeout(() => {
+        progEl.classList.remove('show');
+        fillEl.style.background = '';
+      }, 5000);
+    } finally {
+      isTranscribing = false;
+      btn.textContent = '🎤 从视频转写';
+      btn.style.opacity = '1';
+    }
+  };
+  input.click();
+};
 
 // AI 分析按钮
 document.getElementById('aiAnalyzeBtn').onclick = async () => {
