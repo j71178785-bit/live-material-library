@@ -236,121 +236,138 @@ async function transcribeAudio(body, apiKey) {
   const audioBuffer = Buffer.from(audioBase64, "base64");
   console.log(`  [转写] 收到音频: ${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB, 格式: ${format}`);
 
-  // Step 1: 上传音频文件到 DashScope
-  console.log("  [转写] Step 1: 上传音频文件...");
-  const blob = new Blob([audioBuffer], { type: `audio/${format}` });
-  const formData = new FormData();
-  formData.append("file", blob, `audio.${format}`);
-  formData.append("purpose", "file-extract");
+  // WAV 文件去掉 44 字节头部，拿到原始 PCM（16bit, 16000Hz, mono）
+  let pcmData;
+  if (format === "wav" && audioBuffer.length > 44) {
+    pcmData = audioBuffer.slice(44);
+    console.log(`  [转写] 已剥离 WAV 头部, PCM 大小: ${(pcmData.length / 1024).toFixed(1)} KB`);
+  } else {
+    pcmData = audioBuffer;
+  }
 
-  const uploadResp = await fetch(`${DASHSCOPE_NATIVE}/uploads`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: formData,
+  // 使用 WebSocket 实时识别
+  const WS_URL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference/";
+  const TASK_ID = crypto.randomUUID().replace(/-/g, "").slice(0, 32);
+
+  console.log(`  [转写] 连接 WebSocket: ${WS_URL}`);
+
+  const ws = new WebSocket(WS_URL, {
+    headers: { Authorization: `bearer ${apiKey}` },
   });
-
-  if (!uploadResp.ok) {
-    const errText = await uploadResp.text();
-    console.error("  [转写] 上传失败:", uploadResp.status, errText);
-    throw new Error(`音频上传失败 (${uploadResp.status}): ${errText.slice(0, 200)}`);
-  }
-
-  const uploadData = await uploadResp.json();
-  const fileUrl = uploadData.data?.url;
-
-  if (!fileUrl) {
-    console.error("  [转写] 上传返回异常:", JSON.stringify(uploadData));
-    throw new Error("音频上传成功但未返回文件 URL: " + JSON.stringify(uploadData).slice(0, 300));
-  }
-
-  console.log("  [转写] 上传成功, URL:", fileUrl.slice(0, 80) + "...");
-
-  // Step 2: 提交 Paraformer-v2 转写任务
-  console.log("  [转写] Step 2: 提交转写任务...");
-  const taskResp = await fetch(`${DASHSCOPE_NATIVE}/services/audio/asr/transcription`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "X-DashScope-Async": "enable",
-    },
-    body: JSON.stringify({
-      model: "paraformer-v2",
-      input: {
-        file_urls: [fileUrl],
+  ws.onopen = () => {
+    console.log("  [转写] WebSocket 已连接, 发送 run-task...");
+    ws.sendJSON({
+      header: { action: "run-task", task_id: TASK_ID, streaming: "duplex" },
+      payload: {
+        task_group: "audio",
+        task: "asr",
+        function: "recognition",
+        model: "paraformer-realtime-v2",
+        parameters: {
+          sample_rate: 16000,
+          format: "pcm", // 已剥离 WAV 头，是纯 PCM
+          language_hints: ["zh", "en"],
+        },
+        input: {},
       },
-      parameters: {
-        language_hints: ["zh", "en"],
-      },
-    }),
-  });
-
-  if (!taskResp.ok) {
-    const errText = await taskResp.text();
-    console.error("  [转写] 提交任务失败:", taskResp.status, errText);
-    throw new Error(`创建转写任务失败 (${taskResp.status}): ${errText.slice(0, 200)}`);
-  }
-
-  const taskData = await taskResp.json();
-  const taskId = taskData.output?.task_id;
-
-  if (!taskId) {
-    console.error("  [转写] 任务创建异常:", JSON.stringify(taskData));
-    throw new Error("转写任务创建失败: " + JSON.stringify(taskData).slice(0, 300));
-  }
-
-  console.log("  [转写] 任务已创建, ID:", taskId);
-
-  // Step 3: 轮询任务状态（最多等待 3 分钟）
-  console.log("  [转写] Step 3: 等待转写完成...");
-  for (let i = 0; i < 60; i++) {
-    await sleep(3000); // 每 3 秒查询一次
-
-    const pollResp = await fetch(`${DASHSCOPE_NATIVE}/tasks/${taskId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
     });
+  };
 
-    if (!pollResp.ok) {
-      console.error("  [转写] 轮询失败:", pollResp.status);
-      continue;
-    }
+  let finalText = "";
+  let wsError = null;
 
-    const pollData = await pollResp.json();
-    const status = pollData.output?.task_status;
-    console.log(`  [转写] 轮询 #${i + 1}: ${status}`);
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      const evt = msg.header?.event;
 
-    if (status === "SUCCEEDED") {
-      // Step 4: 获取转写结果
-      const transcriptionUrl = pollData.output?.results?.[0]?.transcription_url;
-      if (!transcriptionUrl) {
-        throw new Error("转写成功但未返回结果 URL");
+      if (evt === "task-started") {
+        console.log("  [转写] 任务已启动, 开始发送音频...");
+        sendPCM(pcmData, ws, TASK_ID);
+      } else if (evt === "result-generated") {
+        const sentence = msg.payload?.output?.sentence;
+        if (sentence?.text && sentence.sentence_end) {
+          // 只用句末最终结果，避免重复积累中间文本
+          finalText += sentence.text;
+          console.log(`  [转写] 最终: ${sentence.text}`);
+        }
+      } else if (evt === "task-finished") {
+        console.log("  [转写] 任务完成");
+        ws.close();
+      } else if (evt === "task-failed") {
+        wsError = new Error(msg.header?.error_message || "转写失败");
+        console.error("  [转写] 任务失败:", wsError.message);
+        ws.close();
       }
-
-      console.log("  [转写] Step 4: 获取转写结果...");
-      const transcriptResp = await fetch(transcriptionUrl);
-      const transcriptData = await transcriptResp.json();
-
-      // Paraformer 返回格式: { transcripts: [{ text: "...", sentences: [...] }] }
-      const text = transcriptData.transcripts?.[0]?.text || "";
-
-      if (!text) {
-        throw new Error("转写结果为空");
-      }
-
-      console.log(`  [转写] 完成! 文字长度: ${text.length}`);
-      return { success: true, transcript: text };
-    } else if (status === "FAILED") {
-      const errMsg = pollData.output?.message || "转写任务失败";
-      throw new Error("转写失败: " + errMsg);
+    } catch (e) {
+      console.warn("  [转写] 消息解析警告:", e.message);
     }
-    // PENDING / RUNNING → 继续等待
-  }
+  };
 
-  throw new Error("转写超时（等待超过 3 分钟）");
+  return new Promise((resolve, reject) => {
+    ws.onclose = () => {
+      if (wsError) {
+        reject(wsError);
+      } else if (finalText) {
+        console.log(`  [转写] 完成! 文字长度: ${finalText.length}`);
+        resolve({ success: true, transcript: finalText });
+      } else {
+        reject(new Error("转写结果为空，请确认音频内容有效"));
+      }
+    };
+    ws.onerror = (err) => {
+      wsError = wsError || new Error(`WebSocket 连接失败: ${err.message || "未知错误"}`);
+    };
+  });
 }
 
+// WebSocket JSON 辅助方法
+WebSocket.prototype.sendJSON = function (obj) {
+  this.send(JSON.stringify(obj));
+};
+
+// 分块发送 PCM 音频
+function sendPCM(pcmBuffer, ws, taskId) {
+  const CHUNK = 3200; // 100ms @ 16kHz/16bit/mono
+  let offset = 0;
+  let stopped = false;
+
+  function sendNext() {
+    if (stopped) return;
+    if (ws.readyState !== 1) { // 1 = OPEN
+      stopped = true;
+      return;
+    }
+    if (offset >= pcmBuffer.length) {
+      console.log(`  [转写] 音频发送完毕, 共 ${pcmBuffer.length} 字节`);
+      try {
+        if (ws.readyState === 1) {
+          ws.sendJSON({
+            header: { action: "finish-task", task_id: taskId, streaming: "duplex" },
+            payload: { input: {} },
+          });
+        }
+      } catch (e) {
+        console.error("  [转写] 发送 finish-task 失败:", e.message);
+      }
+      stopped = true;
+      return;
+    }
+    try {
+      const end = Math.min(offset + CHUNK, pcmBuffer.length);
+      ws.send(pcmBuffer.slice(offset, end));
+      offset = end;
+      setTimeout(sendNext, 100);
+    } catch (e) {
+      console.error("  [转写] 发送音频块失败:", e.message);
+      stopped = true;
+    }
+  }
+
+  sendNext();
+}
+
+// ===========================
 // 创建 HTTP 服务器
 const server = http.createServer(async (req, res) => {
   // CORS 预检
@@ -431,4 +448,13 @@ server.listen(PORT, () => {
   console.log(`  │  功能: 文字分析 / 标签推荐 / 语音转写          │`);
   console.log(`  └─────────────────────────────────────────────┘`);
   console.log(`\n  按 Ctrl+C 停止服务器\n`);
+});
+
+// 全局异常处理，防止未捕获错误导致进程崩溃
+process.on("uncaughtException", (err) => {
+  console.error("  [致命错误]", err.message);
+  // 不退出，保持服务器运行
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("  [未处理 Promise]", reason?.message || reason);
 });
