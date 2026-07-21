@@ -958,12 +958,13 @@ document.getElementById('uploadConfirm').onclick = async () => {
 
   // 视频 + AI 已连接 → 自动一键处理
   const shouldAutoProcess = item.type === 'video' && pendingVideoFile && getWorkerUrl();
+  const fileForAI = pendingVideoFile; // 先保存文件引用，closeUploadModal 会清空它
   closeUploadModal();
   render();
 
   if (shouldAutoProcess) {
     showToast('✓ 素材已入库，正在启动 AI 自动处理…');
-    await autoProcessVideo(item.id, pendingVideoFile);
+    await autoProcessVideo(item.id, fileForAI);
   } else {
     showToast('✓ 素材已入库');
   }
