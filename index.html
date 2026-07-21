@@ -1693,9 +1693,9 @@ async function autoProcessVideo(id, file) {
   const taskId = startBgTask(id, m.name);
   let transcript = '';
 
-  try {
+    try {
     // 步骤 1/4: 提取音频
-    updateBgTask(taskId, 3, '🔊 正在提取音频...');
+    updateBgTask(taskId, 5, '🔊 正在提取音频...');
 
     const wavBlob = await extractAudioFromFile(file, (progress, msg) => {
       const pct = 3 + Math.round(progress * 22); // 3% ~ 25%
@@ -1754,8 +1754,28 @@ async function autoProcessVideo(id, file) {
       saveData(materials);
     }
 
-    // 步骤 5/5: 带货逻辑框架拆解
-    updateBgTask(taskId, 93, '📊 正在拆解带货逻辑框架...');
+    // 完成（拆解框架在后台异步进行，不阻塞）
+    finishBgTask(taskId, true);
+    showToast('✓ 「' + m.name + '」处理完成');
+
+    // 异步拆解带货逻辑框架（后台运行，不阻塞）
+    runBreakdownAsync(id, transcript);
+
+  } catch (err) {
+    console.error('后台处理失败:', err);
+    finishBgTask(taskId, false, err.message);
+    showToast('❌ 「' + m.name + '」处理失败: ' + err.message);
+  }
+}
+
+// 异步拆解带货逻辑框架（独立后台任务，不阻塞主流程）
+async function runBreakdownAsync(materialId, transcript) {
+  const m = materials.find(x => x.id === materialId);
+  if (!m || !transcript) return;
+
+  const taskId = startBgTask(materialId, m.name + ' · 框架拆解');
+  try {
+    updateBgTask(taskId, 10, '📊 正在拆解带货逻辑框架...');
 
     const bResult = await callAiApi('breakdown', {
       name: m.name,
@@ -1769,14 +1789,10 @@ async function autoProcessVideo(id, file) {
       saveData(materials);
     }
 
-    // 完成
     finishBgTask(taskId, true);
-    showToast('✓ 「' + m.name + '」AI 处理完成，点击后台面板「查看」');
-
   } catch (err) {
-    console.error('后台处理失败:', err);
+    console.error('框架拆解失败:', err);
     finishBgTask(taskId, false, err.message);
-    showToast('❌ 「' + m.name + '」处理失败: ' + err.message);
   }
 }
 
