@@ -597,6 +597,59 @@ function showToast(msg, dur=2200) {
   setTimeout(() => t.classList.remove('show'), dur);
 }
 
+// 从视频文件中提取第一帧作为封面
+function extractVideoCover(file) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    let resolved = false;
+
+    const cleanup = () => { URL.revokeObjectURL(url); };
+
+    video.onloadeddata = () => {
+      // 跳到第一帧（有些视频第0秒是黑屏，稍微往后一点）
+      video.currentTime = 0.1;
+    };
+
+    video.onseeked = () => {
+      if (resolved) return;
+      resolved = true;
+      const canvas = document.createElement('canvas');
+      // 限制最大分辨率，避免 base64 过大
+      const maxW = 640, maxH = 360;
+      const ratio = Math.min(maxW / (video.videoWidth || 640), maxH / (video.videoHeight || 360), 1);
+      canvas.width = Math.round((video.videoWidth || 640) * ratio);
+      canvas.height = Math.round((video.videoHeight || 360) * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      cleanup();
+      resolve(dataUrl);
+    };
+
+    video.onerror = () => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      reject(new Error('无法提取视频封面'));
+    };
+
+    // 超时保护
+    setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      reject(new Error('提取封面超时'));
+    }, 15000);
+  });
+}
+
 // 自动识别分类
 function detectCat(type, name, url) {
   if (type === 'link') {
@@ -762,7 +815,11 @@ function renderGrid() {
     if (m.type === 'image') {
       thumb = `<img class="card-thumb" src="${m.dataUrl}" alt="${m.name}" loading="lazy">`;
     } else if (m.type === 'video') {
-      thumb = `<div class="card-thumb-video ${CAT[m.cat]?.bg||''}">🎬</div>`;
+      if (m.coverUrl) {
+        thumb = `<img class="card-thumb" src="${m.coverUrl}" alt="${m.name}" loading="lazy">`;
+      } else {
+        thumb = `<div class="card-thumb-video ${CAT[m.cat]?.bg||''}">🎬</div>`;
+      }
     } else {
       const icons = {ref:'🎯',live:'📹',scene:'🎨',other:'🔗'};
       const bgs   = {ref:'#fff8f0',live:'#f8f5ff',scene:'#f0fdf4',other:'#f8f8f8'};
@@ -929,7 +986,11 @@ function openUploadModal(item) {
   if (item.type === 'image') {
     prev.innerHTML = `<img class="preview-img" src="${item.dataUrl}" alt="">`;
   } else if (item.type === 'video') {
-    prev.innerHTML = `<div class="preview-video-box"><div style="font-size:36px;margin-bottom:8px">🎬</div><div style="font-size:13px;color:#aaa">${item.name}</div><div style="font-size:11px;color:#555;margin-top:4px">视频文件名已记录，内容不占存储空间</div></div>`;
+    if (item.coverUrl) {
+      prev.innerHTML = `<img class="preview-img" src="${item.coverUrl}" alt="${item.name}"><div style="font-size:11px;color:#888;text-align:center;margin-top:4px">视频封面预览</div>`;
+    } else {
+      prev.innerHTML = `<div class="preview-video-box"><div style="font-size:36px;margin-bottom:8px">🎬</div><div style="font-size:13px;color:#aaa">${item.name}</div><div style="font-size:11px;color:#555;margin-top:4px">视频文件名已记录，内容不占存储空间</div></div>`;
+    }
   } else {
     prev.innerHTML = `<div class="preview-link-box"><span style="font-size:24px">🔗</span><span style="font-size:12px;color:#555;word-break:break-all;line-height:1.5">${item.url}</span></div>`;
   }
@@ -1022,7 +1083,12 @@ function handleFiles(files) {
       reader.readAsDataURL(file);
     } else {
       pendingVideoFile = file; // 保存视频文件引用，供一键 AI 处理使用
-      openUploadModal({ type:'video', name:file.name, dataUrl:null });
+      // 异步提取封面，优先用视频第一帧作为封面
+      extractVideoCover(file).then(coverUrl => {
+        openUploadModal({ type:'video', name:file.name, dataUrl:null, coverUrl });
+      }).catch(() => {
+        openUploadModal({ type:'video', name:file.name, dataUrl:null });
+      });
     }
   }
   next();
@@ -1080,7 +1146,11 @@ function openDetailModal(id) {
   if (m.type === 'image') {
     prev.innerHTML = `<img class="preview-img" src="${m.dataUrl}" alt="${m.name}">`;
   } else if (m.type === 'video') {
-    prev.innerHTML = `<div class="preview-video-box"><div style="font-size:36px;margin-bottom:8px">🎬</div><div style="font-size:14px;color:#ccc;font-weight:500">${m.name}</div></div>`;
+    if (m.coverUrl) {
+      prev.innerHTML = `<img class="preview-img" src="${m.coverUrl}" alt="${m.name}">`;
+    } else {
+      prev.innerHTML = `<div class="preview-video-box"><div style="font-size:36px;margin-bottom:8px">🎬</div><div style="font-size:14px;color:#ccc;font-weight:500">${m.name}</div></div>`;
+    }
   } else {
     prev.innerHTML = `<div class="preview-link-box"><span style="font-size:22px">🔗</span><a href="${m.url}" target="_blank" rel="noopener" style="font-size:12px;color:#7c5cfc;word-break:break-all;text-decoration:none;line-height:1.5">${m.url}</a></div>`;
   }
